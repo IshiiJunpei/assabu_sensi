@@ -5,9 +5,6 @@ library("tidyverse")
 library(sf)
 
 # データ読込
-
-df <- read_csv("data/sensi_wgs84_time_fix.csv")
-
 df_sf <- st_read("data/assabu_sensi_WGS84.gpkg") 
 
 # 座標取り出し
