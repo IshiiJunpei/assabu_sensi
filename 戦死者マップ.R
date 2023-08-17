@@ -66,8 +66,10 @@ myLabelFormat = function(...,dates=FALSE){
 df_map <- df %>% 
   drop_na(deathDate) %>% 
   leaflet() %>% 
-  addTiles() %>% 
-#  addProviderTiles("Stamen.Terrain") %>% 
+  addProviderTiles("OpenStreetMap",
+                   group = "osm") %>%
+  addTiles("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+           group = "gmap") %>%
   addMarkers(lng = ~X,
              lat = ~Y,
              popup = ~popup,
@@ -99,14 +101,24 @@ df_map <- df %>%
   addLayersControl(overlayGroups = c(
     "日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後", "死亡年別戦死者"
     )) %>% 
+  addLayersControl(overlayGroups = c("osm","gmap")) %>% 
   hideGroup(c(
-    "日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後"
+    "日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後","gmap"
   )) %>% 
   addLegend(position = 'topright',
             pal = pal,
             values = ~deathDate_num,
             title = "戦没年月日",
-            labFormat = myLabelFormat(dates=TRUE))
+            labFormat = myLabelFormat(dates=TRUE)) %>% 
+  # add the javascript for responsivness
+  onRender("
+    function(el, x) {
+      var style = '<style>#' + el.id + ' { width: 100%; height: 100%; }</style>';
+      $('head').append(style);
+    }"
+  )
+
+
 
 # htmlに保存
 saveWidget(df_map,

@@ -4048,13 +4048,1118 @@ function asArray(value) {
 
 },{}]},{},[13]);
 </script>
+<script>(function (root, factory) {
+	if (typeof define === 'function' && define.amd) {
+		// AMD. Register as an anonymous module.
+		define(['leaflet'], factory);
+	} else if (typeof modules === 'object' && module.exports) {
+		// define a Common JS module that relies on 'leaflet'
+		module.exports = factory(require('leaflet'));
+	} else {
+		// Assume Leaflet is loaded into global object L already
+		factory(L);
+	}
+}(this, function (L) {
+	'use strict';
+
+	L.TileLayer.Provider = L.TileLayer.extend({
+		initialize: function (arg, options) {
+			var providers = L.TileLayer.Provider.providers;
+
+			var parts = arg.split('.');
+
+			var providerName = parts[0];
+			var variantName = parts[1];
+
+			if (!providers[providerName]) {
+				throw 'No such provider (' + providerName + ')';
+			}
+
+			var provider = {
+				url: providers[providerName].url,
+				options: providers[providerName].options
+			};
+
+			// overwrite values in provider from variant.
+			if (variantName && 'variants' in providers[providerName]) {
+				if (!(variantName in providers[providerName].variants)) {
+					throw 'No such variant of ' + providerName + ' (' + variantName + ')';
+				}
+				var variant = providers[providerName].variants[variantName];
+				var variantOptions;
+				if (typeof variant === 'string') {
+					variantOptions = {
+						variant: variant
+					};
+				} else {
+					variantOptions = variant.options;
+				}
+				provider = {
+					url: variant.url || provider.url,
+					options: L.Util.extend({}, provider.options, variantOptions)
+				};
+			}
+
+			// replace attribution placeholders with their values from toplevel provider attribution,
+			// recursively
+			var attributionReplacer = function (attr) {
+				if (attr.indexOf('{attribution.') === -1) {
+					return attr;
+				}
+				return attr.replace(/\{attribution.(\w*)\}/g,
+					function (match, attributionName) {
+						return attributionReplacer(providers[attributionName].options.attribution);
+					}
+				);
+			};
+			provider.options.attribution = attributionReplacer(provider.options.attribution);
+
+			// Compute final options combining provider options with any user overrides
+			var layerOpts = L.Util.extend({}, provider.options, options);
+			L.TileLayer.prototype.initialize.call(this, provider.url, layerOpts);
+		}
+	});
+
+	/**
+	 * Definition of providers.
+	 * see http://leafletjs.com/reference.html#tilelayer for options in the options map.
+	 */
+
+	L.TileLayer.Provider.providers = {
+		OpenStreetMap: {
+			url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution:
+					'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+			},
+			variants: {
+				Mapnik: {},
+				DE: {
+					url: 'https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png',
+					options: {
+						maxZoom: 18
+					}
+				},
+				CH: {
+					url: 'https://tile.osm.ch/switzerland/{z}/{x}/{y}.png',
+					options: {
+						maxZoom: 18,
+						bounds: [[45, 5], [48, 11]]
+					}
+				},
+				France: {
+					url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+					options: {
+						maxZoom: 20,
+						attribution: '&copy; OpenStreetMap France | {attribution.OpenStreetMap}'
+					}
+				},
+				HOT: {
+					url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+					options: {
+						attribution:
+							'{attribution.OpenStreetMap}, ' +
+							'Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> ' +
+							'hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>'
+					}
+				},
+				BZH: {
+					url: 'https://tile.openstreetmap.bzh/br/{z}/{x}/{y}.png',
+					options: {
+						attribution: '{attribution.OpenStreetMap}, Tiles courtesy of <a href="http://www.openstreetmap.bzh/" target="_blank">Breton OpenStreetMap Team</a>',
+						bounds: [[46.2, -5.5], [50, 0.7]]
+					}
+				}
+			}
+		},
+		OpenSeaMap: {
+			url: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
+			options: {
+				attribution: 'Map data: &copy; <a href="http://www.openseamap.org">OpenSeaMap</a> contributors'
+			}
+		},
+		OPNVKarte: {
+			url: 'https://tileserver.memomaps.de/tilegen/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 18,
+				attribution: 'Map <a href="https://memomaps.de/">memomaps.de</a> <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, map data {attribution.OpenStreetMap}'
+			}
+		},
+		OpenTopoMap: {
+			url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 17,
+				attribution: 'Map data: {attribution.OpenStreetMap}, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		OpenRailwayMap: {
+			url: 'https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="https://www.OpenRailwayMap.org">OpenRailwayMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		OpenFireMap: {
+			url: 'http://openfiremap.org/hytiles/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="http://www.openfiremap.org">OpenFireMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		SafeCast: {
+			url: 'https://s3.amazonaws.com/te512.safecast.org/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 16,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="https://blog.safecast.org/about/">SafeCast</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			}
+		},
+		Stadia: {
+			url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+			options: {
+				maxZoom: 20,
+				attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+			},
+			variants: {
+				AlidadeSmooth: {
+					url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png'
+				},
+				AlidadeSmoothDark: {
+					url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png'
+				},
+				OSMBright: {
+					url: 'https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}{r}.png'
+				},
+				Outdoors: {
+					url: 'https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png'
+				}
+			}
+		},
+		Thunderforest: {
+			url: 'https://{s}.tile.thunderforest.com/{variant}/{z}/{x}/{y}.png?apikey={apikey}',
+			options: {
+				attribution:
+					'&copy; <a href="http://www.thunderforest.com/">Thunderforest</a>, {attribution.OpenStreetMap}',
+				variant: 'cycle',
+				apikey: '<insert your api key here>',
+				maxZoom: 22
+			},
+			variants: {
+				OpenCycleMap: 'cycle',
+				Transport: {
+					options: {
+						variant: 'transport'
+					}
+				},
+				TransportDark: {
+					options: {
+						variant: 'transport-dark'
+					}
+				},
+				SpinalMap: {
+					options: {
+						variant: 'spinal-map'
+					}
+				},
+				Landscape: 'landscape',
+				Outdoors: 'outdoors',
+				Pioneer: 'pioneer',
+				MobileAtlas: 'mobile-atlas',
+				Neighbourhood: 'neighbourhood'
+			}
+		},
+		CyclOSM: {
+			url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 20,
+				attribution: '<a href="https://github.com/cyclosm/cyclosm-cartocss-style/releases" title="CyclOSM - Open Bicycle render">CyclOSM</a> | Map data: {attribution.OpenStreetMap}'
+			}
+		},
+		Hydda: {
+			url: 'https://{s}.tile.openstreetmap.se/hydda/{variant}/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 20,
+				variant: 'full',
+				attribution: 'Tiles courtesy of <a href="http://openstreetmap.se/" target="_blank">OpenStreetMap Sweden</a> &mdash; Map data {attribution.OpenStreetMap}'
+			},
+			variants: {
+				Full: 'full',
+				Base: 'base',
+				RoadsAndLabels: 'roads_and_labels'
+			}
+		},
+		Jawg: {
+			url: 'https://{s}.tile.jawg.io/{variant}/{z}/{x}/{y}{r}.png?access-token={accessToken}',
+			options: {
+				attribution:
+					'<a href="http://jawg.io" title="Tiles Courtesy of Jawg Maps" target="_blank">&copy; <b>Jawg</b>Maps</a> ' +
+					'{attribution.OpenStreetMap}',
+				minZoom: 0,
+				maxZoom: 22,
+				subdomains: 'abcd',
+				variant: 'jawg-terrain',
+				// Get your own Jawg access token here : https://www.jawg.io/lab/
+				// NB : this is a demonstration key that comes with no guarantee
+				accessToken: '<insert your access token here>',
+			},
+			variants: {
+				Streets: 'jawg-streets',
+				Terrain: 'jawg-terrain',
+				Sunny: 'jawg-sunny',
+				Dark: 'jawg-dark',
+				Light: 'jawg-light',
+				Matrix: 'jawg-matrix'
+			}
+		},
+		MapBox: {
+			url: 'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}{r}?access_token={accessToken}',
+			options: {
+				attribution:
+					'&copy; <a href="https://www.mapbox.com/about/maps/" target="_blank">Mapbox</a> ' +
+					'{attribution.OpenStreetMap} ' +
+					'<a href="https://www.mapbox.com/map-feedback/" target="_blank">Improve this map</a>',
+				tileSize: 512,
+				maxZoom: 18,
+				zoomOffset: -1,
+				id: 'mapbox/streets-v11',
+				accessToken: '<insert your access token here>',
+			}
+		},
+		MapTiler: {
+			url: 'https://api.maptiler.com/maps/{variant}/{z}/{x}/{y}{r}.{ext}?key={key}',
+			options: {
+				attribution:
+					'<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+				variant: 'streets',
+				ext: 'png',
+				key: '<insert your MapTiler Cloud API key here>',
+				tileSize: 512,
+				zoomOffset: -1,
+				minZoom: 0,
+				maxZoom: 21
+			},
+			variants: {
+				Streets: 'streets',
+				Basic: 'basic',
+				Bright: 'bright',
+				Pastel: 'pastel',
+				Positron: 'positron',
+				Hybrid: {
+					options: {
+						variant: 'hybrid',
+						ext: 'jpg'
+					}
+				},
+				Toner: 'toner',
+				Topo: 'topo',
+				Voyager: 'voyager'
+			}
+		},
+		Stamen: {
+			url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/{variant}/{z}/{x}/{y}{r}.{ext}',
+			options: {
+				attribution:
+					'Map tiles by <a href="http://stamen.com">Stamen Design</a>, ' +
+					'<a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; ' +
+					'Map data {attribution.OpenStreetMap}',
+				subdomains: 'abcd',
+				minZoom: 0,
+				maxZoom: 20,
+				variant: 'toner',
+				ext: 'png'
+			},
+			variants: {
+				Toner: 'toner',
+				TonerBackground: 'toner-background',
+				TonerHybrid: 'toner-hybrid',
+				TonerLines: 'toner-lines',
+				TonerLabels: 'toner-labels',
+				TonerLite: 'toner-lite',
+				Watercolor: {
+					url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/{variant}/{z}/{x}/{y}.{ext}',
+					options: {
+						variant: 'watercolor',
+						ext: 'jpg',
+						minZoom: 1,
+						maxZoom: 16
+					}
+				},
+				Terrain: {
+					options: {
+						variant: 'terrain',
+						minZoom: 0,
+						maxZoom: 18
+					}
+				},
+				TerrainBackground: {
+					options: {
+						variant: 'terrain-background',
+						minZoom: 0,
+						maxZoom: 18
+					}
+				},
+				TerrainLabels: {
+					options: {
+						variant: 'terrain-labels',
+						minZoom: 0,
+						maxZoom: 18
+					}
+				},
+				TopOSMRelief: {
+					url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/{variant}/{z}/{x}/{y}.{ext}',
+					options: {
+						variant: 'toposm-color-relief',
+						ext: 'jpg',
+						bounds: [[22, -132], [51, -56]]
+					}
+				},
+				TopOSMFeatures: {
+					options: {
+						variant: 'toposm-features',
+						bounds: [[22, -132], [51, -56]],
+						opacity: 0.9
+					}
+				}
+			}
+		},
+		TomTom: {
+			url: 'https://{s}.api.tomtom.com/map/1/tile/{variant}/{style}/{z}/{x}/{y}.{ext}?key={apikey}',
+			options: {
+				variant: 'basic',
+				maxZoom: 22,
+				attribution:
+					'<a href="https://tomtom.com" target="_blank">&copy;  1992 - ' + new Date().getFullYear() + ' TomTom.</a> ',
+				subdomains: 'abcd',
+				style: 'main',
+				ext: 'png',
+				apikey: '<insert your API key here>',
+			},
+			variants: {
+				Basic: 'basic',
+				Hybrid: 'hybrid',
+				Labels: 'labels'
+			}
+		},
+		Esri: {
+			url: 'https://server.arcgisonline.com/ArcGIS/rest/services/{variant}/MapServer/tile/{z}/{y}/{x}',
+			options: {
+				variant: 'World_Street_Map',
+				attribution: 'Tiles &copy; Esri'
+			},
+			variants: {
+				WorldStreetMap: {
+					options: {
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+					}
+				},
+				DeLorme: {
+					options: {
+						variant: 'Specialty/DeLorme_World_Base_Map',
+						minZoom: 1,
+						maxZoom: 11,
+						attribution: '{attribution.Esri} &mdash; Copyright: &copy;2012 DeLorme'
+					}
+				},
+				WorldTopoMap: {
+					options: {
+						variant: 'World_Topo_Map',
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
+					}
+				},
+				WorldImagery: {
+					options: {
+						variant: 'World_Imagery',
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+					}
+				},
+				WorldTerrain: {
+					options: {
+						variant: 'World_Terrain_Base',
+						maxZoom: 13,
+						attribution:
+							'{attribution.Esri} &mdash; ' +
+							'Source: USGS, Esri, TANA, DeLorme, and NPS'
+					}
+				},
+				WorldShadedRelief: {
+					options: {
+						variant: 'World_Shaded_Relief',
+						maxZoom: 13,
+						attribution: '{attribution.Esri} &mdash; Source: Esri'
+					}
+				},
+				WorldPhysical: {
+					options: {
+						variant: 'World_Physical_Map',
+						maxZoom: 8,
+						attribution: '{attribution.Esri} &mdash; Source: US National Park Service'
+					}
+				},
+				OceanBasemap: {
+					options: {
+						variant: 'Ocean_Basemap',
+						maxZoom: 13,
+						attribution: '{attribution.Esri} &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri'
+					}
+				},
+				NatGeoWorldMap: {
+					options: {
+						variant: 'NatGeo_World_Map',
+						maxZoom: 16,
+						attribution: '{attribution.Esri} &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC'
+					}
+				},
+				WorldGrayCanvas: {
+					options: {
+						variant: 'Canvas/World_Light_Gray_Base',
+						maxZoom: 16,
+						attribution: '{attribution.Esri} &mdash; Esri, DeLorme, NAVTEQ'
+					}
+				}
+			}
+		},
+		OpenWeatherMap: {
+			url: 'http://{s}.tile.openweathermap.org/map/{variant}/{z}/{x}/{y}.png?appid={apiKey}',
+			options: {
+				maxZoom: 19,
+				attribution: 'Map data &copy; <a href="http://openweathermap.org">OpenWeatherMap</a>',
+				apiKey: '<insert your api key here>',
+				opacity: 0.5
+			},
+			variants: {
+				Clouds: 'clouds',
+				CloudsClassic: 'clouds_cls',
+				Precipitation: 'precipitation',
+				PrecipitationClassic: 'precipitation_cls',
+				Rain: 'rain',
+				RainClassic: 'rain_cls',
+				Pressure: 'pressure',
+				PressureContour: 'pressure_cntr',
+				Wind: 'wind',
+				Temperature: 'temp',
+				Snow: 'snow'
+			}
+		},
+		HERE: {
+			/*
+			 * HERE maps, formerly Nokia maps.
+			 * These basemaps are free, but you need an api id and app key. Please sign up at
+			 * https://developer.here.com/plans
+			 */
+			url:
+				'https://{s}.{base}.maps.api.here.com/maptile/2.1/' +
+				'{type}/{mapID}/{variant}/{z}/{x}/{y}/{size}/{format}?' +
+				'app_id={app_id}&app_code={app_code}&lg={language}',
+			options: {
+				attribution:
+					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://developer.here.com">HERE</a>',
+				subdomains: '1234',
+				mapID: 'newest',
+				'app_id': '<insert your app_id here>',
+				'app_code': '<insert your app_code here>',
+				base: 'base',
+				variant: 'normal.day',
+				maxZoom: 20,
+				type: 'maptile',
+				language: 'eng',
+				format: 'png8',
+				size: '256'
+			},
+			variants: {
+				normalDay: 'normal.day',
+				normalDayCustom: 'normal.day.custom',
+				normalDayGrey: 'normal.day.grey',
+				normalDayMobile: 'normal.day.mobile',
+				normalDayGreyMobile: 'normal.day.grey.mobile',
+				normalDayTransit: 'normal.day.transit',
+				normalDayTransitMobile: 'normal.day.transit.mobile',
+				normalDayTraffic: {
+					options: {
+						variant: 'normal.traffic.day',
+						base: 'traffic',
+						type: 'traffictile'
+					}
+				},
+				normalNight: 'normal.night',
+				normalNightMobile: 'normal.night.mobile',
+				normalNightGrey: 'normal.night.grey',
+				normalNightGreyMobile: 'normal.night.grey.mobile',
+				normalNightTransit: 'normal.night.transit',
+				normalNightTransitMobile: 'normal.night.transit.mobile',
+				reducedDay: 'reduced.day',
+				reducedNight: 'reduced.night',
+				basicMap: {
+					options: {
+						type: 'basetile'
+					}
+				},
+				mapLabels: {
+					options: {
+						type: 'labeltile',
+						format: 'png'
+					}
+				},
+				trafficFlow: {
+					options: {
+						base: 'traffic',
+						type: 'flowtile'
+					}
+				},
+				carnavDayGrey: 'carnav.day.grey',
+				hybridDay: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day'
+					}
+				},
+				hybridDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.mobile'
+					}
+				},
+				hybridDayTransit: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.transit'
+					}
+				},
+				hybridDayGrey: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.grey.day'
+					}
+				},
+				hybridDayTraffic: {
+					options: {
+						variant: 'hybrid.traffic.day',
+						base: 'traffic',
+						type: 'traffictile'
+					}
+				},
+				pedestrianDay: 'pedestrian.day',
+				pedestrianNight: 'pedestrian.night',
+				satelliteDay: {
+					options: {
+						base: 'aerial',
+						variant: 'satellite.day'
+					}
+				},
+				terrainDay: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day'
+					}
+				},
+				terrainDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day.mobile'
+					}
+				}
+			}
+		},
+		HEREv3: {
+			/*
+			 * HERE maps API Version 3.
+			 * These basemaps are free, but you need an API key. Please sign up at
+			 * https://developer.here.com/plans
+			 * Version 3 deprecates the app_id and app_code access in favor of apiKey
+			 *
+			 * Supported access methods as of 2019/12/21:
+			 * @see https://developer.here.com/faqs#access-control-1--how-do-you-control-access-to-here-location-services
+			 */
+			url:
+				'https://{s}.{base}.maps.ls.hereapi.com/maptile/2.1/' +
+				'{type}/{mapID}/{variant}/{z}/{x}/{y}/{size}/{format}?' +
+				'apiKey={apiKey}&lg={language}',
+			options: {
+				attribution:
+					'Map &copy; 1987-' + new Date().getFullYear() + ' <a href="http://developer.here.com">HERE</a>',
+				subdomains: '1234',
+				mapID: 'newest',
+				apiKey: '<insert your apiKey here>',
+				base: 'base',
+				variant: 'normal.day',
+				maxZoom: 20,
+				type: 'maptile',
+				language: 'eng',
+				format: 'png8',
+				size: '256'
+			},
+			variants: {
+				normalDay: 'normal.day',
+				normalDayCustom: 'normal.day.custom',
+				normalDayGrey: 'normal.day.grey',
+				normalDayMobile: 'normal.day.mobile',
+				normalDayGreyMobile: 'normal.day.grey.mobile',
+				normalDayTransit: 'normal.day.transit',
+				normalDayTransitMobile: 'normal.day.transit.mobile',
+				normalNight: 'normal.night',
+				normalNightMobile: 'normal.night.mobile',
+				normalNightGrey: 'normal.night.grey',
+				normalNightGreyMobile: 'normal.night.grey.mobile',
+				normalNightTransit: 'normal.night.transit',
+				normalNightTransitMobile: 'normal.night.transit.mobile',
+				reducedDay: 'reduced.day',
+				reducedNight: 'reduced.night',
+				basicMap: {
+					options: {
+						type: 'basetile'
+					}
+				},
+				mapLabels: {
+					options: {
+						type: 'labeltile',
+						format: 'png'
+					}
+				},
+				trafficFlow: {
+					options: {
+						base: 'traffic',
+						type: 'flowtile'
+					}
+				},
+				carnavDayGrey: 'carnav.day.grey',
+				hybridDay: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day'
+					}
+				},
+				hybridDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.mobile'
+					}
+				},
+				hybridDayTransit: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.day.transit'
+					}
+				},
+				hybridDayGrey: {
+					options: {
+						base: 'aerial',
+						variant: 'hybrid.grey.day'
+					}
+				},
+				pedestrianDay: 'pedestrian.day',
+				pedestrianNight: 'pedestrian.night',
+				satelliteDay: {
+					options: {
+						base: 'aerial',
+						variant: 'satellite.day'
+					}
+				},
+				terrainDay: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day'
+					}
+				},
+				terrainDayMobile: {
+					options: {
+						base: 'aerial',
+						variant: 'terrain.day.mobile'
+					}
+				}
+			}
+		},
+		FreeMapSK: {
+			url: 'https://{s}.freemap.sk/T/{z}/{x}/{y}.jpeg',
+			options: {
+				minZoom: 8,
+				maxZoom: 16,
+				subdomains: 'abcd',
+				bounds: [[47.204642, 15.996093], [49.830896, 22.576904]],
+				attribution:
+					'{attribution.OpenStreetMap}, vizualization CC-By-SA 2.0 <a href="http://freemap.sk">Freemap.sk</a>'
+			}
+		},
+		MtbMap: {
+			url: 'http://tile.mtbmap.cz/mtbmap_tiles/{z}/{x}/{y}.png',
+			options: {
+				attribution:
+					'{attribution.OpenStreetMap} &amp; USGS'
+			}
+		},
+		CartoDB: {
+			url: 'https://{s}.basemaps.cartocdn.com/{variant}/{z}/{x}/{y}{r}.png',
+			options: {
+				attribution: '{attribution.OpenStreetMap} &copy; <a href="https://carto.com/attributions">CARTO</a>',
+				subdomains: 'abcd',
+				maxZoom: 20,
+				variant: 'light_all'
+			},
+			variants: {
+				Positron: 'light_all',
+				PositronNoLabels: 'light_nolabels',
+				PositronOnlyLabels: 'light_only_labels',
+				DarkMatter: 'dark_all',
+				DarkMatterNoLabels: 'dark_nolabels',
+				DarkMatterOnlyLabels: 'dark_only_labels',
+				Voyager: 'rastertiles/voyager',
+				VoyagerNoLabels: 'rastertiles/voyager_nolabels',
+				VoyagerOnlyLabels: 'rastertiles/voyager_only_labels',
+				VoyagerLabelsUnder: 'rastertiles/voyager_labels_under'
+			}
+		},
+		HikeBike: {
+			url: 'https://tiles.wmflabs.org/{variant}/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 19,
+				attribution: '{attribution.OpenStreetMap}',
+				variant: 'hikebike'
+			},
+			variants: {
+				HikeBike: {},
+				HillShading: {
+					options: {
+						maxZoom: 15,
+						variant: 'hillshading'
+					}
+				}
+			}
+		},
+		BasemapAT: {
+			url: 'https://maps{s}.wien.gv.at/basemap/{variant}/{type}/google3857/{z}/{y}/{x}.{format}',
+			options: {
+				maxZoom: 19,
+				attribution: 'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
+				subdomains: ['', '1', '2', '3', '4'],
+				type: 'normal',
+				format: 'png',
+				bounds: [[46.358770, 8.782379], [49.037872, 17.189532]],
+				variant: 'geolandbasemap'
+			},
+			variants: {
+				basemap: {
+					options: {
+						maxZoom: 20, // currently only in Vienna
+						variant: 'geolandbasemap'
+					}
+				},
+				grau: 'bmapgrau',
+				overlay: 'bmapoverlay',
+				terrain: {
+					options: {
+						variant: 'bmapgelaende',
+						type: 'grau',
+						format: 'jpeg'
+					}
+				},
+				surface: {
+					options: {
+						variant: 'bmapoberflaeche',
+						type: 'grau',
+						format: 'jpeg'
+					}
+				},
+				highdpi: {
+					options: {
+						variant: 'bmaphidpi',
+						format: 'jpeg'
+					}
+				},
+				orthofoto: {
+					options: {
+						maxZoom: 20, // currently only in Vienna
+						variant: 'bmaporthofoto30cm',
+						format: 'jpeg'
+					}
+				}
+			}
+		},
+		nlmaps: {
+			url: 'https://geodata.nationaalgeoregister.nl/tiles/service/wmts/{variant}/EPSG:3857/{z}/{x}/{y}.png',
+			options: {
+				minZoom: 6,
+				maxZoom: 19,
+				bounds: [[50.5, 3.25], [54, 7.6]],
+				attribution: 'Kaartgegevens &copy; <a href="https://www.kadaster.nl">Kadaster</a>'
+			},
+			variants: {
+				'standaard': 'brtachtergrondkaart',
+				'pastel': 'brtachtergrondkaartpastel',
+				'grijs': 'brtachtergrondkaartgrijs',
+				'luchtfoto': {
+					'url': 'https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_ortho25/EPSG:3857/{z}/{x}/{y}.jpeg',
+				}
+			}
+		},
+		NASAGIBS: {
+			url: 'https://map1.vis.earthdata.nasa.gov/wmts-webmerc/{variant}/default/{time}/{tilematrixset}{maxZoom}/{z}/{y}/{x}.{format}',
+			options: {
+				attribution:
+					'Imagery provided by services from the Global Imagery Browse Services (GIBS), operated by the NASA/GSFC/Earth Science Data and Information System ' +
+					'(<a href="https://earthdata.nasa.gov">ESDIS</a>) with funding provided by NASA/HQ.',
+				bounds: [[-85.0511287776, -179.999999975], [85.0511287776, 179.999999975]],
+				minZoom: 1,
+				maxZoom: 9,
+				format: 'jpg',
+				time: '',
+				tilematrixset: 'GoogleMapsCompatible_Level'
+			},
+			variants: {
+				ModisTerraTrueColorCR: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+				ModisTerraBands367CR: 'MODIS_Terra_CorrectedReflectance_Bands367',
+				ViirsEarthAtNight2012: {
+					options: {
+						variant: 'VIIRS_CityLights_2012',
+						maxZoom: 8
+					}
+				},
+				ModisTerraLSTDay: {
+					options: {
+						variant: 'MODIS_Terra_Land_Surface_Temp_Day',
+						format: 'png',
+						maxZoom: 7,
+						opacity: 0.75
+					}
+				},
+				ModisTerraSnowCover: {
+					options: {
+						variant: 'MODIS_Terra_NDSI_Snow_Cover',
+						format: 'png',
+						maxZoom: 8,
+						opacity: 0.75
+					}
+				},
+				ModisTerraAOD: {
+					options: {
+						variant: 'MODIS_Terra_Aerosol',
+						format: 'png',
+						maxZoom: 6,
+						opacity: 0.75
+					}
+				},
+				ModisTerraChlorophyll: {
+					options: {
+						variant: 'MODIS_Terra_Chlorophyll_A',
+						format: 'png',
+						maxZoom: 7,
+						opacity: 0.75
+					}
+				}
+			}
+		},
+		NLS: {
+			// NLS maps are copyright National library of Scotland.
+			// http://maps.nls.uk/projects/api/index.html
+			// Please contact NLS for anything other than non-commercial low volume usage
+			//
+			// Map sources: Ordnance Survey 1:1m to 1:63K, 1920s-1940s
+			//   z0-9  - 1:1m
+			//  z10-11 - quarter inch (1:253440)
+			//  z12-18 - one inch (1:63360)
+			url: 'https://nls-{s}.tileserver.com/nls/{z}/{x}/{y}.jpg',
+			options: {
+				attribution: '<a href="http://geo.nls.uk/maps/">National Library of Scotland Historic Maps</a>',
+				bounds: [[49.6, -12], [61.7, 3]],
+				minZoom: 1,
+				maxZoom: 18,
+				subdomains: '0123',
+			}
+		},
+		JusticeMap: {
+			// Justice Map (http://www.justicemap.org/)
+			// Visualize race and income data for your community, county and country.
+			// Includes tools for data journalists, bloggers and community activists.
+			url: 'https://www.justicemap.org/tile/{size}/{variant}/{z}/{x}/{y}.png',
+			options: {
+				attribution: '<a href="http://www.justicemap.org/terms.php">Justice Map</a>',
+				// one of 'county', 'tract', 'block'
+				size: 'county',
+				// Bounds for USA, including Alaska and Hawaii
+				bounds: [[14, -180], [72, -56]]
+			},
+			variants: {
+				income: 'income',
+				americanIndian: 'indian',
+				asian: 'asian',
+				black: 'black',
+				hispanic: 'hispanic',
+				multi: 'multi',
+				nonWhite: 'nonwhite',
+				white: 'white',
+				plurality: 'plural'
+			}
+		},
+		GeoportailFrance: {
+			url: 'https://wxs.ign.fr/{apikey}/geoportail/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&STYLE={style}&TILEMATRIXSET=PM&FORMAT={format}&LAYER={variant}&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+			options: {
+				attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Geoportail France</a>',
+				bounds: [[-75, -180], [81, 180]],
+				minZoom: 2,
+				maxZoom: 18,
+				// Get your own geoportail apikey here : http://professionnels.ign.fr/ign/contrats/
+				// NB : 'choisirgeoportail' is a demonstration key that comes with no guarantee
+				apikey: 'choisirgeoportail',
+				format: 'image/png',
+				style: 'normal',
+				variant: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'
+			},
+			variants: {
+				plan: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
+				parcels: {
+					options: {
+						variant: 'CADASTRALPARCELS.PARCELLAIRE_EXPRESS',
+						style: 'PCI vecteur',
+						maxZoom: 20
+					}
+				},
+				orthos: {
+					options: {
+						maxZoom: 19,
+						format: 'image/jpeg',
+						variant: 'ORTHOIMAGERY.ORTHOPHOTOS'
+					}
+				}
+			}
+		},
+		OneMapSG: {
+			url: 'https://maps-{s}.onemap.sg/v3/{variant}/{z}/{x}/{y}.png',
+			options: {
+				variant: 'Default',
+				minZoom: 11,
+				maxZoom: 18,
+				bounds: [[1.56073, 104.11475], [1.16, 103.502]],
+				attribution: '<img src="https://docs.onemap.sg/maps/images/oneMap64-01.png" style="height:20px;width:20px;"/> New OneMap | Map data &copy; contributors, <a href="http://SLA.gov.sg">Singapore Land Authority</a>'
+			},
+			variants: {
+				Default: 'Default',
+				Night: 'Night',
+				Original: 'Original',
+				Grey: 'Grey',
+				LandLot: 'LandLot'
+			}
+		},
+		USGS: {
+			url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+			options: {
+				maxZoom: 20,
+				attribution: 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+			},
+			variants: {
+				USTopo: {},
+				USImagery: {
+					url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}'
+				},
+				USImageryTopo: {
+					url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}'
+				}
+			}
+		},
+		WaymarkedTrails: {
+			url: 'https://tile.waymarkedtrails.org/{variant}/{z}/{x}/{y}.png',
+			options: {
+				maxZoom: 18,
+				attribution: 'Map data: {attribution.OpenStreetMap} | Map style: &copy; <a href="https://waymarkedtrails.org">waymarkedtrails.org</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+			},
+			variants: {
+				hiking: 'hiking',
+				cycling: 'cycling',
+				mtb: 'mtb',
+				slopes: 'slopes',
+				riding: 'riding',
+				skating: 'skating'
+			}
+		},
+		OpenAIP: {
+			url: 'https://{s}.tile.maps.openaip.net/geowebcache/service/tms/1.0.0/openaip_basemap@EPSG%3A900913@png/{z}/{x}/{y}.{ext}',
+			options: {
+				attribution: '<a href="https://www.openaip.net/">openAIP Data</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-NC-SA</a>)',
+				ext: 'png',
+				minZoom: 4,
+				maxZoom: 14,
+				tms: true,
+				detectRetina: true,
+				subdomains: '12'
+			}
+		},
+		OpenSnowMap: {
+			url: 'https://tiles.opensnowmap.org/{variant}/{z}/{x}/{y}.png',
+			options: {
+				minZoom: 9,
+				maxZoom: 18,
+				attribution: 'Map data: {attribution.OpenStreetMap} & ODbL, &copy; <a href="https://www.opensnowmap.org/iframes/data.html">www.opensnowmap.org</a> <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
+			},
+			variants: {
+				pistes: 'pistes',
+			}
+		},
+		AzureMaps: {
+			url: 
+				'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+				'&tilesetId={variant}&x={x}&y={y}&zoom={z}&language={language}'+
+				'&subscription-key={subscriptionKey}',
+			options: {
+				attribution: 'See https://docs.microsoft.com/en-US/rest/api/maps/renderv2/getmaptilepreview for details.',
+				apiVersion: '2.0',
+				variant: 'microsoft.imagery',
+				subscriptionKey: '<insert your subscription key here>',
+				language: 'en-US',
+			},
+			variants: {
+				MicrosoftImagery: 'microsoft.imagery',
+				MicrosoftBaseDarkGrey: 'microsoft.base.darkgrey',
+				MicrosoftBaseRoad: 'microsoft.base.road',
+				MicrosoftBaseHybridRoad: 'microsoft.base.hybrid.road',
+				MicrosoftTerraMain: 'microsoft.terra.main',
+				MicrosoftWeatherInfraredMain: {
+					url: 
+					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+					'&tilesetId={variant}&x={x}&y={y}&zoom={z}'+
+					'&timeStamp={timeStamp}&language={language}' +
+					'&subscription-key={subscriptionKey}',
+					options: {
+						timeStamp: '2021-05-08T09:03:00Z',
+						attribution: 'See https://docs.microsoft.com/en-US/rest/api/maps/renderv2/getmaptilepreview#uri-parameters for details.',
+						variant: 'microsoft.weather.infrared.main',
+					},
+				},
+				MicrosoftWeatherRadarMain: {
+					url: 
+					'https://atlas.microsoft.com/map/tile?api-version={apiVersion}'+
+					'&tilesetId={variant}&x={x}&y={y}&zoom={z}'+
+					'&timeStamp={timeStamp}&language={language}' +
+					'&subscription-key={subscriptionKey}',
+					options: {
+						timeStamp: '2021-05-08T09:03:00Z',
+						attribution: 'See https://docs.microsoft.com/en-US/rest/api/maps/renderv2/getmaptilepreview#uri-parameters for details.',
+						variant: 'microsoft.weather.radar.main',
+					},
+				}
+			},
+		}
+	};
+
+	L.tileLayer.provider = function (provider, options) {
+		return new L.TileLayer.Provider(provider, options);
+	};
+
+	return L;
+}));
+</script>
+<script>LeafletWidget.methods.addProviderTiles = function(provider, layerId, group, options) {
+  this.layerManager.addLayer(L.tileLayer.provider(provider, options), "tile", layerId, group);
+};
+</script>
 
 </head>
 <body style="background-color: white;">
 <div id="htmlwidget_container">
-  <div class="leaflet html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-e9c17bdf53aeee665f09" style="width:100%;height:400px;"></div>
+  <div class="leaflet html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-77ded5c39dd94df81c21" style="width:100%;height:400px;"></div>
 </div>
-<script type="application/json" data-for="htmlwidget-e9c17bdf53aeee665f09">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addTiles","args":["https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false,"attribution":"&copy; <a href=\"https://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"}]},{"method":"addMarkers","args":[[50.69651383304729,41.81022,44.276671],[142.7411914110197,123.430985,125.406739],null,null,"日中戦争開戦以前",{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["白馬喜三郎 上等兵 薩哈嗹陸軍病院ルイコフ分院 1921 年 3 月 2 日","表神明伊佐美 上等兵 満州国奉天省奉天 1936 年 11 月 8 日","木下藤吉郎 一等兵 満州 1904 年 11 月 28 日"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addMarkers","args":[[37.692514,47.9682,38.134557,37.967613,33.246153,34.182554,38.306103,29.674034,47.9682,47.9682,38.134557,39.493444,38.042684,33.850495],[116.270707,118.633987,114.449249,140.900662,112.802708,117.175185,116.519254,115.681864,118.633987,118.633987,114.449249,114.295183,114.514412,130.883554],null,null,"太平洋戦争開戦以前",{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["福田清次郎 上等兵 中華民国河北省景県黄左付近 1940 年 9 月 13 日","尾村信一 上等兵 満州国興安北省ノモンハン 1939 年 8 月 24 日","横島勝三郎 兵長 中華民国河北省獻県章鎮 1940 年 6 月 27 日","工藤春夫 三等兵曹 宮城県亘理郡山下村 1940 年 5 月 10 日","福島庸吉 伍長 河南省石砦附近 1938 年 5 月 25 日","三上修蔵 上等兵 江蘇省銅山県徐州野戦予備病院 1938 年 6 月 7 日","三上竜蔵 兵長 中華民国河北省滄県許村 1941 年 2 月 4 日","石岡栄蔵 曹長 中華民国江省瑞昌県下洞余村 1938 年 9 月 23 日","岩田作馬 上等兵 満州国興安北南ノモンハン 1939 年 8 月 25 日","紺野徳太郎 伍長 満州国安北省ハルハ河 1939 年 7 月 12 日","佐藤義明 上等兵 中華民国河北省獻県大章鎮 1940 年 6 月 27 日","川辺一司 上等兵 山西省霊●丘）県楽陶山宵家楼 1938 年 11 月 30 日","伊藤文次郎 上等兵 中華民国河北省石家荘陸軍病院 1939 年 8 月 28 日","小沢完三 伍長 小倉陸軍病院 1938 年 9 月 19 日"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addMarkers","args":[[26.23255053777179,52.877626,26.18875311699806,-2.911838562747451,31.23394,35.131141,26.161062,15.623037,-9.287304021569526,26.71372,15.178181,11.41750773294957,33.137551,26.122459,15.142393,26.237228,43.769599,6.140555,43.076913,16.81505,26.184094,8.499537,30.784318,15.53829089599095,-9.848033802143634,25.671236,44.551946,-2.417751909869367,-2.29295264609041,-9.833265753156155,-2.562504638652479,26.117932,26.122459,26.122459,26.214591,6.047699,52.877626,41.786625,15.61736053414338,45.538099,21.371244,41.920928,-9.427916169197221,12.533115,26.231569,16.588817,43.377105,-11.20864574889617,-7.84469101327571,26.121072,51.069017,43.058729,15.199386,6.102208967323071,22.948474,11.51871427667556,6.047699,26.104599,26.89421,47.02091513820736,-2.302936995607094,26.177008,26.121843,26.104599,26.218518,14.600196,26.122459,34.999488,50.727328,45.767523,26.217132,26.23125506179115,14.535068,41.895729,19.225583,42.317971,8.494104999999999,41.768991,26.107431,45.02695,26.212127,0.3735593790586056,-9.261416891425259,-2.342873690954383,9.825448,41.908793,6.009459,-2.911838562747451,26.971038,40.181496,-2.39778478352772,26.122459,-11.20864574889617,26.10982,26.110745,-9.417750562766706,45.085157,38.065392,14.599864,13.49734158485517,26.23233268095873,43.811754,30.784318,-9.271895245593933,41.883365,-2.34287369095438,37.608112,15.182488,12.88965960273778,47.01258856201256],[127.7442434550233,172.890618,127.7155847395221,128.4839342478741,121.467178,136.84687,127.669016,113.980958,159.7252042217116,127.806993,145.754791,162.2852728846149,162.474607,127.670561,120.349628,127.753045,142.348264,147.115723,129.516174,121.276428,127.746912,123.30423,130.277149,145.723829445267,165.5818211914115,94.108063,129.633325,139.5024123551545,139.5099066439539,165.714220293534,139.7472257892674,127.698852,127.670561,127.670561,127.679947,147.084137,172.890618,140.751597,113.9883665448255,126.965166,96.425354,140.225495,160.0763428781657,122.80188,127.739772,121.25528,128.237091,157.3605863784969,145.7326644437012,127.682799,132.701661,141.374814,145.672119,171.7344116951644,120.215529,162.2310289734909,147.084137,127.690441,112.572046,142.2610017953571,139.3275456165024,127.722879,127.742646,127.690441,127.714678,120.984484,127.670561,136.617711,156.30582,126.687744,127.719452,127.7412509438708,121.048685,140.694412,109.184464,140.96583,123.307251,140.704455,127.703692,135.074708,127.682693,173.7643261808604,159.7214570773119,139.8471496399257,122.909134,140.334523,147.078369,128.8436601102441,112.373245,122.148691,139.6947657676718,127.670561,158.1200076435002,127.676741,127.704035,160.3537096292509,147.892044,114.453919,120.98414,144.819518596809,127.7421617081346,142.361974,130.277149,159.7308249383111,140.32552,139.6073323983457,114.359067,120.527521,109.913086603024,142.2493440127803],null,null,"太平洋戦争開戦後",{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["福田常寿 軍曹 沖縄本島幸地 1945 年 5 月 10 日","福田力松 上等兵 アラスカ州）アッツ（アトゥ）島 1943 年 5 月 29 日","西山常雄 伍長 沖縄本島津嘉山 1945 年 6 月 2 日","佐藤由太郎 兵長 西部ニューギニヤモルッカ州シエフ第36師団野戦病院 1944 年 3 月 31 日","中納伍郎 伍長 中華民国江蘚省上海独立砲兵第2連隊第5中隊 1946 年 6 月 20 日","鹿能嘉市 海軍一等兵曹 中部太平洋方面 1944 年 6 月 19 日","宮元喜一郎 兵長 沖縄本島豊見城 1945 年 5 月 15 日","徳田秀夫 兵長 南支那方面 1944 年 9 月 10 日","山口邦夫 伍長 ソロモン群島ガダルカナル島アウステン山第一線陣地 1943 年 1 月 22 日","桜田春雄 陸軍飛行少尉 沖縄群島伊江島 1945 年 5 月 18 日","富吉一夫 海軍二等兵曹 内南洋方面 1943 年 6 月 8 日","能登勝夫 兵長 南洋群島ブラウン 1944 年 2 月 24 日","南沢庄太郎 海軍軍属 北太平洋方面 1943 年 8 月 12 日","福田駒蔵 兵長 沖縄本島真栄里 1945 年 6 月 19 日","山本竹伍郎 海軍上等整備兵曹 比島ピナッポ（ピナツボ）山西北 1945 年 4 月 7 日","杉村正幸 伍長 沖縄本島翁長 1945 年 4 月 26 日","岩崎留太郎 一等兵 旭川陸軍病院 1942 年 5 月 31 日","大和田勇雄 兵長 南洋群島・カロリン諸島・オッタカリ島 1945 年 4 月 10 日","遠藤　博 兵長 満州延吉第1陸軍病院 1945 年 12 月 3 日","小林政蔵 軍曹 北島中部ルソン島 1945 年 7 月 30 日","福島勝春 伍長 沖縄本島大理 1945 年 6 月 20 日","山田嘉蔵 伍長 比島ミンダナオ島 1945 年 6 月 27 日","木口勝美 軍曹 硫黄島方面 1945 年 3 月 17 日","川股鉄三郎 海軍軍属 サイパン島北方洋上 1944 年 6 月 15 日","飴谷勝蔵 海軍一等整備兵 南太平洋方面 1942 年 10 月 26 日","中村満芳 軍曹 印度国アッサム州コヒマニ（ナガランドコヒマ） 1944 年 4 月 7 日","田沢政雄 上等兵 中華民国牡丹江省 1945 年 5 月 15 日","山本武雄 兵長 西部ニューギニヤ「サルミ」 1944 年 10 月 11 日","久保田勝次郎 兵長 西武ニューギニアサルミ 1944 年 8 月 2 日","広田久四郎 海軍二等兵曹 南太平洋方面 1942 年 10 月 26 日","佐々木且三 兵長 西部ニューギニヤ「サルミ」 1944 年 9 月 4 日","山田留八 伍長 沖縄本島新垣 1945 年 6 月 18 日","下川部栄作 伍長 沖縄本島真栄里 1945 年 6 月 24 日","山形源五郎 上等兵 　　　　　　　〃 1945 年 6 月 19 日","中山文雄 兵長 沖縄本島弁ヶ島 1945 年 5 月 16 日","中山一二 兵長 南洋群島カロリン諸島メレヨン島オッタカイ島 1945 年 4 月 19 日","岩崎秀蔵 上等兵 アッツ島 1943 年 5 月 29 日","臼杵栄作 一等兵 函館中央病院 1944 年 4 月 20 日","根津源一 上等兵曹 南支那）海方）面 1944 年 5 月 22 日","大石信夫 上等兵 満州国浜江省阿城県阿城 1943 年 5 月 23 日","大河内政治 兵長 ビルマ国テイカンパン 1945 年 3 月 13 日","柚木安一 上等兵 厚沢部村鷲堀 1951 年 8 月 7 日","土田楠寛 伍長 ソロモン群島ガダルカナル 1942 年 8 月 21 日","佐々木貞美 海軍水兵長 比島方面 1944 年 10 月 25 日","上野秀男 伍長 沖縄幸地 1945 年 5 月 20 日","鹿能勝三郎 伍長 比島ルソン島 1945 年 5 月 20 日","奈良　浩 伍長 中華民国吉林省敦化県敦化長野病院 1945 年 5 月 15 日","西田　要 海軍二等機関兵曹 ニューギニヤ南東海面 1942 年 5 月 7 日","三上惣吉 准尉 東部ニューギニアトウマング 1944 年 10 月 5 日","木村邦三 伍長 沖縄国吉 1945 年 6 月 26 日","木村政二 伍長 ソ連アムフレ州イズベストコーワヤ地区ウルガール収容所 1948 年 9 月 20 日","干山　口 一等兵 札幌陸軍病院 1942 年 3 月 4 日","干山長助 陸軍兵長 南洋群島方面 1945 年 1 月 6 日","干山　巷 伍長 南洋群島ミレ 1945 年 7 月 22 日","宮下鉄男 海飛兵長 台南航空基地 1945 年 4 月 7 日","菅野一郎 兵長 南洋群島ブラウン島 1944 年 2 月 24 日","高杉柳次郎 兵長 南洋群島カロリン島メレヨン島オッタカイ島 1945 年 2 月 24 日","井越惣四郎 兵長 沖縄本島真壁 1945 年 4 月 19 日","八巻英治 伍長 中華民国湖南省衡陽市方面 1944 年 8 月 4 日","森高正直 伍長 樺太真岡廊清水村熊笹峠 1945 年 8 月 22 日","大和田富一 伍長 ニューギニヤ「サルミ」 1946 年 3 月 21 日","吉田信一 一等兵 沖縄本島島尻郡 1945 年 6 月 29 日","西沢一雄 兵長 沖縄八重瀬島 1945 年 6 月 17 日","沢田哲夫 軍曹 沖縄本島島尻郡真壁 1945 年 6 月 10 日","斎藤定明 兵長 沖縄運玉玉稜？） 1945 年 9 月 11 日","野沢菊太郎 海軍二等機関兵曹 比島マニラ部 1945 年 2 月 23 日","堀　　清 軍曹 沖縄本島真栄里 1945 年 6 月 19 日","堀　幸男 三等兵曹 野北病院 1945 年 6 月 4 日","谷　四郎 伍長 北千島占守島国端四領 1945 年 8 月 18 日","新谷与三吉 軍属 満州国竜江省 1944 年 8 月 1 日","麓　定男 伍長 沖縄本島首里 1945 年 5 月 15 日","古世　優 伍長 沖縄本島幸地 1945 年 5 月 2 日","杉山久二 上等兵 比島ルソン島リザール州マッキンレー 1942 年 5 月 26 日","沢中清一 上等兵 亀田郡七飯 1949 年 2 月 13 日","長崎源次 軍属 海南島白沙県石碌西松組出張所 1943 年 6 月 13 日","川崎利平 一等兵 室蘭市常磐町13室蘭病院 1942 年 2 月 22 日","斉蔵達三 准尉 比島ミンダナオ島 1945 年 6 月 10 日","角田角蔵 　〃 函館病院 1944 年 6 月 27 日","伊勢谷忠吉 伍長 沖縄本島宇江城 1945 年 6 月 25 日","平野　節 上等兵 ソ連沿海州ムリー地区アクール病院 1947 年 10 月 10 日","北島信利 陸軍少尉 沖縄方面 1945 年 6 月 10 日","干場忠栄 海軍軍属 ギルバート諸島 1943 年 11 月 15 日","中林安太郎 伍長 ソロモン諸島ガダルカナル島ビザン 1943 年 1 月 19 日","岩山長三郎 上等兵 西部ニューギニア「サルミ」 1944 年 10 月 23 日","鈴木保男 伍長 比島ネグロス島 1945 年 6 月 23 日","高橋正彦 兵長 厚沢部中館 1948 年 6 月 15 日","鈴木敬一 兵長 南洋群島カロリン諸島メレヨン島 1944 年 11 月 30 日","成田英男 海軍上等水兵 モルッカ諸島 1944 年 6 月 29 日","成田丑太郎 兵長 中華民国湖南省衡陽県衡陽第兵站病院 1944 年 9 月 3 日","佐々木国男 兵長 満州国奉天省熊兵岳）城陸軍病院 1942 年 7 月 10 日","朝倉　寛 伍長 ニューギニヤ「サルミ」 1945 年 3 月 17 日","村田七楼 兵長 沖縄本島真栄里 1945 年 6 月 19 日","相良栄吉 海軍一等飛曹 珊瑚海 1942 年 5 月 7 日","保木本雪雄 伍長 沖縄本島伊敷 1945 年 6 月 22 日","上野忠雄 伍長 沖縄本島真栄平 1945 年 6 月 11 日","岡頭松蔵 兵長 ソロモン群島ガダルカナルタイボ岬 1942 年 9 月 1 日","室　滋晴 上等兵 南千島択捉島 1944 年 11 月 15 日","竹山松雄 伍長 中華民国河北省安国県常家村 1945 年 6 月 28 日","板木福士 少尉 比島「クラーク」西南方マニラ 1945 年 1 月 11 日","福田吉五郎 上等兵 マリアナ諸島方面 1944 年 8 月 10 日","竹ヶ原吉夫 伍長 沖縄本島幸地 1945 年 4 月 30 日","畠谷幹男 兵長 旭川市近文線5号 1944 年 12 月 27 日","村田慶造 海軍水兵長 硫黄島 1945 年 3 月 17 日","伊藤定一 二等兵曹 ソロモン諸島 1942 年 12 月 20 日","股村万四郎 一等兵 厚沢部南館 1944 年 7 月 11 日","木下清雄 伍長 西部ニューギニヤ「サルミ」 1945 年 7 月 11 日","由利政吉 海軍一等水兵 中支湖北省武昌陸軍病院 1944 年 12 月 13 日","木村武国 海軍水兵長 比島クラーク地区 1945 年 5 月 16 日","敦賀政美 海軍上等水兵 本那海面 1945 年 1 月 12 日","徳田樺夫 兵長 樺太豊真山道熊笹峠 1945 年 9 月 22 日"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addCircleMarkers","args":[[26.23255053777179,52.877626,37.692514,26.18875311699806,-2.911838562747451,31.23394,35.131141,26.161062,47.9682,50.69651383304729,15.623037,-9.287304021569526,26.71372,15.178181,11.41750773294957,33.137551,26.122459,15.142393,26.237228,43.769599,6.140555,43.076913,38.134557,16.81505,26.184094,8.499537,30.784318,37.967613,15.53829089599095,-9.848033802143634,33.246153,25.671236,44.551946,-2.417751909869367,-2.29295264609041,-9.833265753156155,-2.562504638652479,26.117932,34.182554,38.306103,29.674034,26.122459,26.122459,26.214591,6.047699,52.877626,41.786625,15.61736053414338,47.9682,45.538099,21.371244,41.920928,-9.427916169197221,12.533115,26.231569,16.588817,43.377105,-11.20864574889617,-7.84469101327571,26.121072,51.069017,43.058729,15.199386,6.102208967323071,22.948474,47.9682,11.51871427667556,6.047699,26.104599,26.89421,47.02091513820736,-2.302936995607094,26.177008,26.121843,26.104599,26.218518,14.600196,26.122459,34.999488,50.727328,45.767523,26.217132,26.23125506179115,14.535068,41.895729,38.134557,19.225583,39.493444,42.317971,8.494104999999999,38.042684,41.768991,26.107431,45.02695,26.212127,0.3735593790586056,-9.261416891425259,-2.342873690954383,9.825448,41.908793,6.009459,-2.911838562747451,26.971038,41.81022,40.181496,-2.39778478352772,26.122459,-11.20864574889617,26.10982,26.110745,-9.417750562766706,45.085157,38.065392,14.599864,13.49734158485517,26.23233268095873,43.811754,30.784318,-9.271895245593933,41.883365,-2.34287369095438,44.276671,37.608112,15.182488,33.850495,12.88965960273778,47.01258856201256],[127.7442434550233,172.890618,116.270707,127.7155847395221,128.4839342478741,121.467178,136.84687,127.669016,118.633987,142.7411914110197,113.980958,159.7252042217116,127.806993,145.754791,162.2852728846149,162.474607,127.670561,120.349628,127.753045,142.348264,147.115723,129.516174,114.449249,121.276428,127.746912,123.30423,130.277149,140.900662,145.723829445267,165.5818211914115,112.802708,94.108063,129.633325,139.5024123551545,139.5099066439539,165.714220293534,139.7472257892674,127.698852,117.175185,116.519254,115.681864,127.670561,127.670561,127.679947,147.084137,172.890618,140.751597,113.9883665448255,118.633987,126.965166,96.425354,140.225495,160.0763428781657,122.80188,127.739772,121.25528,128.237091,157.3605863784969,145.7326644437012,127.682799,132.701661,141.374814,145.672119,171.7344116951644,120.215529,118.633987,162.2310289734909,147.084137,127.690441,112.572046,142.2610017953571,139.3275456165024,127.722879,127.742646,127.690441,127.714678,120.984484,127.670561,136.617711,156.30582,126.687744,127.719452,127.7412509438708,121.048685,140.694412,114.449249,109.184464,114.295183,140.96583,123.307251,114.514412,140.704455,127.703692,135.074708,127.682693,173.7643261808604,159.7214570773119,139.8471496399257,122.909134,140.334523,147.078369,128.8436601102441,112.373245,123.430985,122.148691,139.6947657676718,127.670561,158.1200076435002,127.676741,127.704035,160.3537096292509,147.892044,114.453919,120.98414,144.819518596809,127.7421617081346,142.361974,130.277149,159.7308249383111,140.32552,139.6073323983457,125.406739,114.359067,120.527521,130.883554,109.913086603024,142.2493440127803],6,null,"死亡年別戦死者",{"interactive":true,"className":"","stroke":true,"color":false,"weight":2,"opacity":0.5,"fill":true,"fillColor":["#36B779","#1E9D89","#2A778E","#37B878","#23A983","#54C568","#25AC82","#36B878","#31688E","#808080","#28AE80","#1F988B","#36B878","#1F9E89","#22A785","#1FA088","#38B977","#34B679","#35B779","#218F8D","#34B679","#44BF70","#2C738E","#3BBB75","#38B977","#39B977","#32B67A","#2C718E","#25AC82","#1F948C","#3A548C","#23A983","#36B878","#2AB07F","#27AD81","#1F948C","#28AE80","#38B977","#3A548C","#287C8E","#375A8C","#38B977","#38B977","#36B878","#34B679","#1E9D89","#24AA83","#25AB82","#31688E","#1E9D89","#32B67A","#808080","#20928C","#2BB07F","#37B878","#37B878","#36B878","#218E8D","#29AF7F","#39B977","#A4DB36","#228C8D","#2EB37C","#3ABA76","#34B679","#31668E","#22A785","#31B57B","#34B679","#27AD81","#3CBC74","#4DC26C","#39B977","#38B977","#38B977","#3EBC74","#31B57B","#38B977","#37B878","#3CBB75","#27AD81","#36B878","#35B779","#218F8D","#B4DE2B","#2C738E","#1F9E89","#365D8D","#228B8D","#38B977","#31688E","#25AC82","#38B977","#80D34D","#38B977","#20A386","#1F988B","#2AB07F","#38B977","#9BD93C","#2DB27D","#25AC82","#28AE80","#443A83","#21918C","#32B67A","#38B977","#218E8D","#38B977","#38B977","#20928C","#2CB17E","#39B977","#2EB37C","#27AD81","#35B779","#2EB37C","#32B67A","#1F978B","#26AD81","#3ABA76","#808080","#2DB27D","#36B878","#375A8C","#2EB37C","#3FBC73"],"fillOpacity":0.9},null,null,["福田常寿 軍曹 沖縄本島幸地 1945 年 5 月 10 日","福田力松 上等兵 アラスカ州）アッツ（アトゥ）島 1943 年 5 月 29 日","福田清次郎 上等兵 中華民国河北省景県黄左付近 1940 年 9 月 13 日","西山常雄 伍長 沖縄本島津嘉山 1945 年 6 月 2 日","佐藤由太郎 兵長 西部ニューギニヤモルッカ州シエフ第36師団野戦病院 1944 年 3 月 31 日","中納伍郎 伍長 中華民国江蘚省上海独立砲兵第2連隊第5中隊 1946 年 6 月 20 日","鹿能嘉市 海軍一等兵曹 中部太平洋方面 1944 年 6 月 19 日","宮元喜一郎 兵長 沖縄本島豊見城 1945 年 5 月 15 日","尾村信一 上等兵 満州国興安北省ノモンハン 1939 年 8 月 24 日","白馬喜三郎 上等兵 薩哈嗹陸軍病院ルイコフ分院 1921 年 3 月 2 日","徳田秀夫 兵長 南支那方面 1944 年 9 月 10 日","山口邦夫 伍長 ソロモン群島ガダルカナル島アウステン山第一線陣地 1943 年 1 月 22 日","桜田春雄 陸軍飛行少尉 沖縄群島伊江島 1945 年 5 月 18 日","富吉一夫 海軍二等兵曹 内南洋方面 1943 年 6 月 8 日","能登勝夫 兵長 南洋群島ブラウン 1944 年 2 月 24 日","南沢庄太郎 海軍軍属 北太平洋方面 1943 年 8 月 12 日","福田駒蔵 兵長 沖縄本島真栄里 1945 年 6 月 19 日","山本竹伍郎 海軍上等整備兵曹 比島ピナッポ（ピナツボ）山西北 1945 年 4 月 7 日","杉村正幸 伍長 沖縄本島翁長 1945 年 4 月 26 日","岩崎留太郎 一等兵 旭川陸軍病院 1942 年 5 月 31 日","大和田勇雄 兵長 南洋群島・カロリン諸島・オッタカリ島 1945 年 4 月 10 日","遠藤　博 兵長 満州延吉第1陸軍病院 1945 年 12 月 3 日","横島勝三郎 兵長 中華民国河北省獻県章鎮 1940 年 6 月 27 日","小林政蔵 軍曹 北島中部ルソン島 1945 年 7 月 30 日","福島勝春 伍長 沖縄本島大理 1945 年 6 月 20 日","山田嘉蔵 伍長 比島ミンダナオ島 1945 年 6 月 27 日","木口勝美 軍曹 硫黄島方面 1945 年 3 月 17 日","工藤春夫 三等兵曹 宮城県亘理郡山下村 1940 年 5 月 10 日","川股鉄三郎 海軍軍属 サイパン島北方洋上 1944 年 6 月 15 日","飴谷勝蔵 海軍一等整備兵 南太平洋方面 1942 年 10 月 26 日","福島庸吉 伍長 河南省石砦附近 1938 年 5 月 25 日","中村満芳 軍曹 印度国アッサム州コヒマニ（ナガランドコヒマ） 1944 年 4 月 7 日","田沢政雄 上等兵 中華民国牡丹江省 1945 年 5 月 15 日","山本武雄 兵長 西部ニューギニヤ「サルミ」 1944 年 10 月 11 日","久保田勝次郎 兵長 西武ニューギニアサルミ 1944 年 8 月 2 日","広田久四郎 海軍二等兵曹 南太平洋方面 1942 年 10 月 26 日","佐々木且三 兵長 西部ニューギニヤ「サルミ」 1944 年 9 月 4 日","山田留八 伍長 沖縄本島新垣 1945 年 6 月 18 日","三上修蔵 上等兵 江蘇省銅山県徐州野戦予備病院 1938 年 6 月 7 日","三上竜蔵 兵長 中華民国河北省滄県許村 1941 年 2 月 4 日","石岡栄蔵 曹長 中華民国江省瑞昌県下洞余村 1938 年 9 月 23 日","下川部栄作 伍長 沖縄本島真栄里 1945 年 6 月 24 日","山形源五郎 上等兵 　　　　　　　〃 1945 年 6 月 19 日","中山文雄 兵長 沖縄本島弁ヶ島 1945 年 5 月 16 日","中山一二 兵長 南洋群島カロリン諸島メレヨン島オッタカイ島 1945 年 4 月 19 日","岩崎秀蔵 上等兵 アッツ島 1943 年 5 月 29 日","臼杵栄作 一等兵 函館中央病院 1944 年 4 月 20 日","根津源一 上等兵曹 南支那）海方）面 1944 年 5 月 22 日","岩田作馬 上等兵 満州国興安北南ノモンハン 1939 年 8 月 25 日","大石信夫 上等兵 満州国浜江省阿城県阿城 1943 年 5 月 23 日","大河内政治 兵長 ビルマ国テイカンパン 1945 年 3 月 13 日","柚木安一 上等兵 厚沢部村鷲堀 1951 年 8 月 7 日","土田楠寛 伍長 ソロモン群島ガダルカナル 1942 年 8 月 21 日","佐々木貞美 海軍水兵長 比島方面 1944 年 10 月 25 日","上野秀男 伍長 沖縄幸地 1945 年 5 月 20 日","鹿能勝三郎 伍長 比島ルソン島 1945 年 5 月 20 日","奈良　浩 伍長 中華民国吉林省敦化県敦化長野病院 1945 年 5 月 15 日","西田　要 海軍二等機関兵曹 ニューギニヤ南東海面 1942 年 5 月 7 日","三上惣吉 准尉 東部ニューギニアトウマング 1944 年 10 月 5 日","木村邦三 伍長 沖縄国吉 1945 年 6 月 26 日","木村政二 伍長 ソ連アムフレ州イズベストコーワヤ地区ウルガール収容所 1948 年 9 月 20 日","干山　口 一等兵 札幌陸軍病院 1942 年 3 月 4 日","干山長助 陸軍兵長 南洋群島方面 1945 年 1 月 6 日","干山　巷 伍長 南洋群島ミレ 1945 年 7 月 22 日","宮下鉄男 海飛兵長 台南航空基地 1945 年 4 月 7 日","紺野徳太郎 伍長 満州国安北省ハルハ河 1939 年 7 月 12 日","菅野一郎 兵長 南洋群島ブラウン島 1944 年 2 月 24 日","高杉柳次郎 兵長 南洋群島カロリン島メレヨン島オッタカイ島 1945 年 2 月 24 日","井越惣四郎 兵長 沖縄本島真壁 1945 年 4 月 19 日","八巻英治 伍長 中華民国湖南省衡陽市方面 1944 年 8 月 4 日","森高正直 伍長 樺太真岡廊清水村熊笹峠 1945 年 8 月 22 日","大和田富一 伍長 ニューギニヤ「サルミ」 1946 年 3 月 21 日","吉田信一 一等兵 沖縄本島島尻郡 1945 年 6 月 29 日","西沢一雄 兵長 沖縄八重瀬島 1945 年 6 月 17 日","沢田哲夫 軍曹 沖縄本島島尻郡真壁 1945 年 6 月 10 日","斎藤定明 兵長 沖縄運玉玉稜？） 1945 年 9 月 11 日","野沢菊太郎 海軍二等機関兵曹 比島マニラ部 1945 年 2 月 23 日","堀　　清 軍曹 沖縄本島真栄里 1945 年 6 月 19 日","堀　幸男 三等兵曹 野北病院 1945 年 6 月 4 日","谷　四郎 伍長 北千島占守島国端四領 1945 年 8 月 18 日","新谷与三吉 軍属 満州国竜江省 1944 年 8 月 1 日","麓　定男 伍長 沖縄本島首里 1945 年 5 月 15 日","古世　優 伍長 沖縄本島幸地 1945 年 5 月 2 日","杉山久二 上等兵 比島ルソン島リザール州マッキンレー 1942 年 5 月 26 日","沢中清一 上等兵 亀田郡七飯 1949 年 2 月 13 日","佐藤義明 上等兵 中華民国河北省獻県大章鎮 1940 年 6 月 27 日","長崎源次 軍属 海南島白沙県石碌西松組出張所 1943 年 6 月 13 日","川辺一司 上等兵 山西省霊●丘）県楽陶山宵家楼 1938 年 11 月 30 日","川崎利平 一等兵 室蘭市常磐町13室蘭病院 1942 年 2 月 22 日","斉蔵達三 准尉 比島ミンダナオ島 1945 年 6 月 10 日","伊藤文次郎 上等兵 中華民国河北省石家荘陸軍病院 1939 年 8 月 28 日","角田角蔵 　〃 函館病院 1944 年 6 月 27 日","伊勢谷忠吉 伍長 沖縄本島宇江城 1945 年 6 月 25 日","平野　節 上等兵 ソ連沿海州ムリー地区アクール病院 1947 年 10 月 10 日","北島信利 陸軍少尉 沖縄方面 1945 年 6 月 10 日","干場忠栄 海軍軍属 ギルバート諸島 1943 年 11 月 15 日","中林安太郎 伍長 ソロモン諸島ガダルカナル島ビザン 1943 年 1 月 19 日","岩山長三郎 上等兵 西部ニューギニア「サルミ」 1944 年 10 月 23 日","鈴木保男 伍長 比島ネグロス島 1945 年 6 月 23 日","高橋正彦 兵長 厚沢部中館 1948 年 6 月 15 日","鈴木敬一 兵長 南洋群島カロリン諸島メレヨン島 1944 年 11 月 30 日","成田英男 海軍上等水兵 モルッカ諸島 1944 年 6 月 29 日","成田丑太郎 兵長 中華民国湖南省衡陽県衡陽第兵站病院 1944 年 9 月 3 日","表神明伊佐美 上等兵 満州国奉天省奉天 1936 年 11 月 8 日","佐々木国男 兵長 満州国奉天省熊兵岳）城陸軍病院 1942 年 7 月 10 日","朝倉　寛 伍長 ニューギニヤ「サルミ」 1945 年 3 月 17 日","村田七楼 兵長 沖縄本島真栄里 1945 年 6 月 19 日","相良栄吉 海軍一等飛曹 珊瑚海 1942 年 5 月 7 日","保木本雪雄 伍長 沖縄本島伊敷 1945 年 6 月 22 日","上野忠雄 伍長 沖縄本島真栄平 1945 年 6 月 11 日","岡頭松蔵 兵長 ソロモン群島ガダルカナルタイボ岬 1942 年 9 月 1 日","室　滋晴 上等兵 南千島択捉島 1944 年 11 月 15 日","竹山松雄 伍長 中華民国河北省安国県常家村 1945 年 6 月 28 日","板木福士 少尉 比島「クラーク」西南方マニラ 1945 年 1 月 11 日","福田吉五郎 上等兵 マリアナ諸島方面 1944 年 8 月 10 日","竹ヶ原吉夫 伍長 沖縄本島幸地 1945 年 4 月 30 日","畠谷幹男 兵長 旭川市近文線5号 1944 年 12 月 27 日","村田慶造 海軍水兵長 硫黄島 1945 年 3 月 17 日","伊藤定一 二等兵曹 ソロモン諸島 1942 年 12 月 20 日","股村万四郎 一等兵 厚沢部南館 1944 年 7 月 11 日","木下清雄 伍長 西部ニューギニヤ「サルミ」 1945 年 7 月 11 日","木下藤吉郎 一等兵 満州 1904 年 11 月 28 日","由利政吉 海軍一等水兵 中支湖北省武昌陸軍病院 1944 年 12 月 13 日","木村武国 海軍水兵長 比島クラーク地区 1945 年 5 月 16 日","小沢完三 伍長 小倉陸軍病院 1938 年 9 月 19 日","敦賀政美 海軍上等水兵 本那海面 1945 年 1 月 12 日","徳田樺夫 兵長 樺太豊真山道熊笹峠 1945 年 9 月 22 日"],null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addLayersControl","args":[[],["日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後","死亡年別戦死者"],{"collapsed":true,"autoZIndex":true,"position":"topright"}]},{"method":"hideGroup","args":[["日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後"]]},{"method":"addLegend","args":[{"colors":["#808080 , #808080 10.4087257374069%, #808080 22.1368674133584%, #808080 33.8650090893098%, #808080 45.5931507652612%, #808080 57.3212924412127%, #423F85 69.0494341171641%, #20928C 80.7775757931156%, #8DD646 92.505717469067%, #808080 "],"labels":["1909-10-08","1915-03-31","1920-09-20","1926-03-13","1931-09-03","1937-02-23","1942-08-16","1948-02-06"],"na_color":null,"na_label":"NA","opacity":0.5,"position":"topright","type":"numeric","title":"戦没年月日","extra":{"p_1":0.1040872573740691,"p_n":0.9250571746906703},"layerId":null,"className":"info legend","group":null}]}],"limits":{"lat":[-11.20864574889617,52.877626],"lng":[94.108063,173.7643261808604]}},"evals":[],"jsHooks":{"render":[{"code":"function(el, x, data) {\n  return (\n    function(el, x) {\n      var style = '<style>#' + el.id + ' { width: 100%; height: 100%; }<\/style>';\n      $('head').append(style);\n    }).call(this.getMap(), el, x, data);\n}","data":null}]}}</script>
-<script type="application/htmlwidget-sizing" data-for="htmlwidget-e9c17bdf53aeee665f09">{"viewer":{"width":"100%","height":400,"padding":0,"fill":true},"browser":{"width":"100%","height":400,"padding":0,"fill":true}}</script>
+<script type="application/json" data-for="htmlwidget-77ded5c39dd94df81c21">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["OpenStreetMap",null,"osm",{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addTiles","args":["https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",null,"gmap",{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false}]},{"method":"addMarkers","args":[[50.69651383304729,41.81022,44.276671],[142.7411914110197,123.430985,125.406739],null,null,"日中戦争開戦以前",{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["白馬喜三郎 上等兵 薩哈嗹陸軍病院ルイコフ分院 1921 年 3 月 2 日","表神明伊佐美 上等兵 満州国奉天省奉天 1936 年 11 月 8 日","木下藤吉郎 一等兵 満州 1904 年 11 月 28 日"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addMarkers","args":[[37.692514,47.9682,38.134557,37.967613,33.246153,34.182554,38.306103,29.674034,47.9682,47.9682,38.134557,39.493444,38.042684,33.850495],[116.270707,118.633987,114.449249,140.900662,112.802708,117.175185,116.519254,115.681864,118.633987,118.633987,114.449249,114.295183,114.514412,130.883554],null,null,"太平洋戦争開戦以前",{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["福田清次郎 上等兵 中華民国河北省景県黄左付近 1940 年 9 月 13 日","尾村信一 上等兵 満州国興安北省ノモンハン 1939 年 8 月 24 日","横島勝三郎 兵長 中華民国河北省獻県章鎮 1940 年 6 月 27 日","工藤春夫 三等兵曹 宮城県亘理郡山下村 1940 年 5 月 10 日","福島庸吉 伍長 河南省石砦附近 1938 年 5 月 25 日","三上修蔵 上等兵 江蘇省銅山県徐州野戦予備病院 1938 年 6 月 7 日","三上竜蔵 兵長 中華民国河北省滄県許村 1941 年 2 月 4 日","石岡栄蔵 曹長 中華民国江省瑞昌県下洞余村 1938 年 9 月 23 日","岩田作馬 上等兵 満州国興安北南ノモンハン 1939 年 8 月 25 日","紺野徳太郎 伍長 満州国安北省ハルハ河 1939 年 7 月 12 日","佐藤義明 上等兵 中華民国河北省獻県大章鎮 1940 年 6 月 27 日","川辺一司 上等兵 山西省霊●丘）県楽陶山宵家楼 1938 年 11 月 30 日","伊藤文次郎 上等兵 中華民国河北省石家荘陸軍病院 1939 年 8 月 28 日","小沢完三 伍長 小倉陸軍病院 1938 年 9 月 19 日"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addMarkers","args":[[26.23255053777179,52.877626,26.18875311699806,-2.911838562747451,31.23394,35.131141,26.161062,15.623037,-9.287304021569526,26.71372,15.178181,11.41750773294957,33.137551,26.122459,15.142393,26.237228,43.769599,6.140555,43.076913,16.81505,26.184094,8.499537,30.784318,15.53829089599095,-9.848033802143634,25.671236,44.551946,-2.417751909869367,-2.29295264609041,-9.833265753156155,-2.562504638652479,26.117932,26.122459,26.122459,26.214591,6.047699,52.877626,41.786625,15.61736053414338,45.538099,21.371244,41.920928,-9.427916169197221,12.533115,26.231569,16.588817,43.377105,-11.20864574889617,-7.84469101327571,26.121072,51.069017,43.058729,15.199386,6.102208967323071,22.948474,11.51871427667556,6.047699,26.104599,26.89421,47.02091513820736,-2.302936995607094,26.177008,26.121843,26.104599,26.218518,14.600196,26.122459,34.999488,50.727328,45.767523,26.217132,26.23125506179115,14.535068,41.895729,19.225583,42.317971,8.494104999999999,41.768991,26.107431,45.02695,26.212127,0.3735593790586056,-9.261416891425259,-2.342873690954383,9.825448,41.908793,6.009459,-2.911838562747451,26.971038,40.181496,-2.39778478352772,26.122459,-11.20864574889617,26.10982,26.110745,-9.417750562766706,45.085157,38.065392,14.599864,13.49734158485517,26.23233268095873,43.811754,30.784318,-9.271895245593933,41.883365,-2.34287369095438,37.608112,15.182488,12.88965960273778,47.01258856201256],[127.7442434550233,172.890618,127.7155847395221,128.4839342478741,121.467178,136.84687,127.669016,113.980958,159.7252042217116,127.806993,145.754791,162.2852728846149,162.474607,127.670561,120.349628,127.753045,142.348264,147.115723,129.516174,121.276428,127.746912,123.30423,130.277149,145.723829445267,165.5818211914115,94.108063,129.633325,139.5024123551545,139.5099066439539,165.714220293534,139.7472257892674,127.698852,127.670561,127.670561,127.679947,147.084137,172.890618,140.751597,113.9883665448255,126.965166,96.425354,140.225495,160.0763428781657,122.80188,127.739772,121.25528,128.237091,157.3605863784969,145.7326644437012,127.682799,132.701661,141.374814,145.672119,171.7344116951644,120.215529,162.2310289734909,147.084137,127.690441,112.572046,142.2610017953571,139.3275456165024,127.722879,127.742646,127.690441,127.714678,120.984484,127.670561,136.617711,156.30582,126.687744,127.719452,127.7412509438708,121.048685,140.694412,109.184464,140.96583,123.307251,140.704455,127.703692,135.074708,127.682693,173.7643261808604,159.7214570773119,139.8471496399257,122.909134,140.334523,147.078369,128.8436601102441,112.373245,122.148691,139.6947657676718,127.670561,158.1200076435002,127.676741,127.704035,160.3537096292509,147.892044,114.453919,120.98414,144.819518596809,127.7421617081346,142.361974,130.277149,159.7308249383111,140.32552,139.6073323983457,114.359067,120.527521,109.913086603024,142.2493440127803],null,null,"太平洋戦争開戦後",{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},["福田常寿 軍曹 沖縄本島幸地 1945 年 5 月 10 日","福田力松 上等兵 アラスカ州）アッツ（アトゥ）島 1943 年 5 月 29 日","西山常雄 伍長 沖縄本島津嘉山 1945 年 6 月 2 日","佐藤由太郎 兵長 西部ニューギニヤモルッカ州シエフ第36師団野戦病院 1944 年 3 月 31 日","中納伍郎 伍長 中華民国江蘚省上海独立砲兵第2連隊第5中隊 1946 年 6 月 20 日","鹿能嘉市 海軍一等兵曹 中部太平洋方面 1944 年 6 月 19 日","宮元喜一郎 兵長 沖縄本島豊見城 1945 年 5 月 15 日","徳田秀夫 兵長 南支那方面 1944 年 9 月 10 日","山口邦夫 伍長 ソロモン群島ガダルカナル島アウステン山第一線陣地 1943 年 1 月 22 日","桜田春雄 陸軍飛行少尉 沖縄群島伊江島 1945 年 5 月 18 日","富吉一夫 海軍二等兵曹 内南洋方面 1943 年 6 月 8 日","能登勝夫 兵長 南洋群島ブラウン 1944 年 2 月 24 日","南沢庄太郎 海軍軍属 北太平洋方面 1943 年 8 月 12 日","福田駒蔵 兵長 沖縄本島真栄里 1945 年 6 月 19 日","山本竹伍郎 海軍上等整備兵曹 比島ピナッポ（ピナツボ）山西北 1945 年 4 月 7 日","杉村正幸 伍長 沖縄本島翁長 1945 年 4 月 26 日","岩崎留太郎 一等兵 旭川陸軍病院 1942 年 5 月 31 日","大和田勇雄 兵長 南洋群島・カロリン諸島・オッタカリ島 1945 年 4 月 10 日","遠藤　博 兵長 満州延吉第1陸軍病院 1945 年 12 月 3 日","小林政蔵 軍曹 北島中部ルソン島 1945 年 7 月 30 日","福島勝春 伍長 沖縄本島大理 1945 年 6 月 20 日","山田嘉蔵 伍長 比島ミンダナオ島 1945 年 6 月 27 日","木口勝美 軍曹 硫黄島方面 1945 年 3 月 17 日","川股鉄三郎 海軍軍属 サイパン島北方洋上 1944 年 6 月 15 日","飴谷勝蔵 海軍一等整備兵 南太平洋方面 1942 年 10 月 26 日","中村満芳 軍曹 印度国アッサム州コヒマニ（ナガランドコヒマ） 1944 年 4 月 7 日","田沢政雄 上等兵 中華民国牡丹江省 1945 年 5 月 15 日","山本武雄 兵長 西部ニューギニヤ「サルミ」 1944 年 10 月 11 日","久保田勝次郎 兵長 西武ニューギニアサルミ 1944 年 8 月 2 日","広田久四郎 海軍二等兵曹 南太平洋方面 1942 年 10 月 26 日","佐々木且三 兵長 西部ニューギニヤ「サルミ」 1944 年 9 月 4 日","山田留八 伍長 沖縄本島新垣 1945 年 6 月 18 日","下川部栄作 伍長 沖縄本島真栄里 1945 年 6 月 24 日","山形源五郎 上等兵 　　　　　　　〃 1945 年 6 月 19 日","中山文雄 兵長 沖縄本島弁ヶ島 1945 年 5 月 16 日","中山一二 兵長 南洋群島カロリン諸島メレヨン島オッタカイ島 1945 年 4 月 19 日","岩崎秀蔵 上等兵 アッツ島 1943 年 5 月 29 日","臼杵栄作 一等兵 函館中央病院 1944 年 4 月 20 日","根津源一 上等兵曹 南支那）海方）面 1944 年 5 月 22 日","大石信夫 上等兵 満州国浜江省阿城県阿城 1943 年 5 月 23 日","大河内政治 兵長 ビルマ国テイカンパン 1945 年 3 月 13 日","柚木安一 上等兵 厚沢部村鷲堀 1951 年 8 月 7 日","土田楠寛 伍長 ソロモン群島ガダルカナル 1942 年 8 月 21 日","佐々木貞美 海軍水兵長 比島方面 1944 年 10 月 25 日","上野秀男 伍長 沖縄幸地 1945 年 5 月 20 日","鹿能勝三郎 伍長 比島ルソン島 1945 年 5 月 20 日","奈良　浩 伍長 中華民国吉林省敦化県敦化長野病院 1945 年 5 月 15 日","西田　要 海軍二等機関兵曹 ニューギニヤ南東海面 1942 年 5 月 7 日","三上惣吉 准尉 東部ニューギニアトウマング 1944 年 10 月 5 日","木村邦三 伍長 沖縄国吉 1945 年 6 月 26 日","木村政二 伍長 ソ連アムフレ州イズベストコーワヤ地区ウルガール収容所 1948 年 9 月 20 日","干山　口 一等兵 札幌陸軍病院 1942 年 3 月 4 日","干山長助 陸軍兵長 南洋群島方面 1945 年 1 月 6 日","干山　巷 伍長 南洋群島ミレ 1945 年 7 月 22 日","宮下鉄男 海飛兵長 台南航空基地 1945 年 4 月 7 日","菅野一郎 兵長 南洋群島ブラウン島 1944 年 2 月 24 日","高杉柳次郎 兵長 南洋群島カロリン島メレヨン島オッタカイ島 1945 年 2 月 24 日","井越惣四郎 兵長 沖縄本島真壁 1945 年 4 月 19 日","八巻英治 伍長 中華民国湖南省衡陽市方面 1944 年 8 月 4 日","森高正直 伍長 樺太真岡廊清水村熊笹峠 1945 年 8 月 22 日","大和田富一 伍長 ニューギニヤ「サルミ」 1946 年 3 月 21 日","吉田信一 一等兵 沖縄本島島尻郡 1945 年 6 月 29 日","西沢一雄 兵長 沖縄八重瀬島 1945 年 6 月 17 日","沢田哲夫 軍曹 沖縄本島島尻郡真壁 1945 年 6 月 10 日","斎藤定明 兵長 沖縄運玉玉稜？） 1945 年 9 月 11 日","野沢菊太郎 海軍二等機関兵曹 比島マニラ部 1945 年 2 月 23 日","堀　　清 軍曹 沖縄本島真栄里 1945 年 6 月 19 日","堀　幸男 三等兵曹 野北病院 1945 年 6 月 4 日","谷　四郎 伍長 北千島占守島国端四領 1945 年 8 月 18 日","新谷与三吉 軍属 満州国竜江省 1944 年 8 月 1 日","麓　定男 伍長 沖縄本島首里 1945 年 5 月 15 日","古世　優 伍長 沖縄本島幸地 1945 年 5 月 2 日","杉山久二 上等兵 比島ルソン島リザール州マッキンレー 1942 年 5 月 26 日","沢中清一 上等兵 亀田郡七飯 1949 年 2 月 13 日","長崎源次 軍属 海南島白沙県石碌西松組出張所 1943 年 6 月 13 日","川崎利平 一等兵 室蘭市常磐町13室蘭病院 1942 年 2 月 22 日","斉蔵達三 准尉 比島ミンダナオ島 1945 年 6 月 10 日","角田角蔵 　〃 函館病院 1944 年 6 月 27 日","伊勢谷忠吉 伍長 沖縄本島宇江城 1945 年 6 月 25 日","平野　節 上等兵 ソ連沿海州ムリー地区アクール病院 1947 年 10 月 10 日","北島信利 陸軍少尉 沖縄方面 1945 年 6 月 10 日","干場忠栄 海軍軍属 ギルバート諸島 1943 年 11 月 15 日","中林安太郎 伍長 ソロモン諸島ガダルカナル島ビザン 1943 年 1 月 19 日","岩山長三郎 上等兵 西部ニューギニア「サルミ」 1944 年 10 月 23 日","鈴木保男 伍長 比島ネグロス島 1945 年 6 月 23 日","高橋正彦 兵長 厚沢部中館 1948 年 6 月 15 日","鈴木敬一 兵長 南洋群島カロリン諸島メレヨン島 1944 年 11 月 30 日","成田英男 海軍上等水兵 モルッカ諸島 1944 年 6 月 29 日","成田丑太郎 兵長 中華民国湖南省衡陽県衡陽第兵站病院 1944 年 9 月 3 日","佐々木国男 兵長 満州国奉天省熊兵岳）城陸軍病院 1942 年 7 月 10 日","朝倉　寛 伍長 ニューギニヤ「サルミ」 1945 年 3 月 17 日","村田七楼 兵長 沖縄本島真栄里 1945 年 6 月 19 日","相良栄吉 海軍一等飛曹 珊瑚海 1942 年 5 月 7 日","保木本雪雄 伍長 沖縄本島伊敷 1945 年 6 月 22 日","上野忠雄 伍長 沖縄本島真栄平 1945 年 6 月 11 日","岡頭松蔵 兵長 ソロモン群島ガダルカナルタイボ岬 1942 年 9 月 1 日","室　滋晴 上等兵 南千島択捉島 1944 年 11 月 15 日","竹山松雄 伍長 中華民国河北省安国県常家村 1945 年 6 月 28 日","板木福士 少尉 比島「クラーク」西南方マニラ 1945 年 1 月 11 日","福田吉五郎 上等兵 マリアナ諸島方面 1944 年 8 月 10 日","竹ヶ原吉夫 伍長 沖縄本島幸地 1945 年 4 月 30 日","畠谷幹男 兵長 旭川市近文線5号 1944 年 12 月 27 日","村田慶造 海軍水兵長 硫黄島 1945 年 3 月 17 日","伊藤定一 二等兵曹 ソロモン諸島 1942 年 12 月 20 日","股村万四郎 一等兵 厚沢部南館 1944 年 7 月 11 日","木下清雄 伍長 西部ニューギニヤ「サルミ」 1945 年 7 月 11 日","由利政吉 海軍一等水兵 中支湖北省武昌陸軍病院 1944 年 12 月 13 日","木村武国 海軍水兵長 比島クラーク地区 1945 年 5 月 16 日","敦賀政美 海軍上等水兵 本那海面 1945 年 1 月 12 日","徳田樺夫 兵長 樺太豊真山道熊笹峠 1945 年 9 月 22 日"],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addCircleMarkers","args":[[26.23255053777179,52.877626,37.692514,26.18875311699806,-2.911838562747451,31.23394,35.131141,26.161062,47.9682,50.69651383304729,15.623037,-9.287304021569526,26.71372,15.178181,11.41750773294957,33.137551,26.122459,15.142393,26.237228,43.769599,6.140555,43.076913,38.134557,16.81505,26.184094,8.499537,30.784318,37.967613,15.53829089599095,-9.848033802143634,33.246153,25.671236,44.551946,-2.417751909869367,-2.29295264609041,-9.833265753156155,-2.562504638652479,26.117932,34.182554,38.306103,29.674034,26.122459,26.122459,26.214591,6.047699,52.877626,41.786625,15.61736053414338,47.9682,45.538099,21.371244,41.920928,-9.427916169197221,12.533115,26.231569,16.588817,43.377105,-11.20864574889617,-7.84469101327571,26.121072,51.069017,43.058729,15.199386,6.102208967323071,22.948474,47.9682,11.51871427667556,6.047699,26.104599,26.89421,47.02091513820736,-2.302936995607094,26.177008,26.121843,26.104599,26.218518,14.600196,26.122459,34.999488,50.727328,45.767523,26.217132,26.23125506179115,14.535068,41.895729,38.134557,19.225583,39.493444,42.317971,8.494104999999999,38.042684,41.768991,26.107431,45.02695,26.212127,0.3735593790586056,-9.261416891425259,-2.342873690954383,9.825448,41.908793,6.009459,-2.911838562747451,26.971038,41.81022,40.181496,-2.39778478352772,26.122459,-11.20864574889617,26.10982,26.110745,-9.417750562766706,45.085157,38.065392,14.599864,13.49734158485517,26.23233268095873,43.811754,30.784318,-9.271895245593933,41.883365,-2.34287369095438,44.276671,37.608112,15.182488,33.850495,12.88965960273778,47.01258856201256],[127.7442434550233,172.890618,116.270707,127.7155847395221,128.4839342478741,121.467178,136.84687,127.669016,118.633987,142.7411914110197,113.980958,159.7252042217116,127.806993,145.754791,162.2852728846149,162.474607,127.670561,120.349628,127.753045,142.348264,147.115723,129.516174,114.449249,121.276428,127.746912,123.30423,130.277149,140.900662,145.723829445267,165.5818211914115,112.802708,94.108063,129.633325,139.5024123551545,139.5099066439539,165.714220293534,139.7472257892674,127.698852,117.175185,116.519254,115.681864,127.670561,127.670561,127.679947,147.084137,172.890618,140.751597,113.9883665448255,118.633987,126.965166,96.425354,140.225495,160.0763428781657,122.80188,127.739772,121.25528,128.237091,157.3605863784969,145.7326644437012,127.682799,132.701661,141.374814,145.672119,171.7344116951644,120.215529,118.633987,162.2310289734909,147.084137,127.690441,112.572046,142.2610017953571,139.3275456165024,127.722879,127.742646,127.690441,127.714678,120.984484,127.670561,136.617711,156.30582,126.687744,127.719452,127.7412509438708,121.048685,140.694412,114.449249,109.184464,114.295183,140.96583,123.307251,114.514412,140.704455,127.703692,135.074708,127.682693,173.7643261808604,159.7214570773119,139.8471496399257,122.909134,140.334523,147.078369,128.8436601102441,112.373245,123.430985,122.148691,139.6947657676718,127.670561,158.1200076435002,127.676741,127.704035,160.3537096292509,147.892044,114.453919,120.98414,144.819518596809,127.7421617081346,142.361974,130.277149,159.7308249383111,140.32552,139.6073323983457,125.406739,114.359067,120.527521,130.883554,109.913086603024,142.2493440127803],6,null,"死亡年別戦死者",{"interactive":true,"className":"","stroke":true,"color":false,"weight":2,"opacity":0.5,"fill":true,"fillColor":["#36B779","#1E9D89","#2A778E","#37B878","#23A983","#54C568","#25AC82","#36B878","#31688E","#808080","#28AE80","#1F988B","#36B878","#1F9E89","#22A785","#1FA088","#38B977","#34B679","#35B779","#218F8D","#34B679","#44BF70","#2C738E","#3BBB75","#38B977","#39B977","#32B67A","#2C718E","#25AC82","#1F948C","#3A548C","#23A983","#36B878","#2AB07F","#27AD81","#1F948C","#28AE80","#38B977","#3A548C","#287C8E","#375A8C","#38B977","#38B977","#36B878","#34B679","#1E9D89","#24AA83","#25AB82","#31688E","#1E9D89","#32B67A","#808080","#20928C","#2BB07F","#37B878","#37B878","#36B878","#218E8D","#29AF7F","#39B977","#A4DB36","#228C8D","#2EB37C","#3ABA76","#34B679","#31668E","#22A785","#31B57B","#34B679","#27AD81","#3CBC74","#4DC26C","#39B977","#38B977","#38B977","#3EBC74","#31B57B","#38B977","#37B878","#3CBB75","#27AD81","#36B878","#35B779","#218F8D","#B4DE2B","#2C738E","#1F9E89","#365D8D","#228B8D","#38B977","#31688E","#25AC82","#38B977","#80D34D","#38B977","#20A386","#1F988B","#2AB07F","#38B977","#9BD93C","#2DB27D","#25AC82","#28AE80","#443A83","#21918C","#32B67A","#38B977","#218E8D","#38B977","#38B977","#20928C","#2CB17E","#39B977","#2EB37C","#27AD81","#35B779","#2EB37C","#32B67A","#1F978B","#26AD81","#3ABA76","#808080","#2DB27D","#36B878","#375A8C","#2EB37C","#3FBC73"],"fillOpacity":0.9},null,null,["福田常寿 軍曹 沖縄本島幸地 1945 年 5 月 10 日","福田力松 上等兵 アラスカ州）アッツ（アトゥ）島 1943 年 5 月 29 日","福田清次郎 上等兵 中華民国河北省景県黄左付近 1940 年 9 月 13 日","西山常雄 伍長 沖縄本島津嘉山 1945 年 6 月 2 日","佐藤由太郎 兵長 西部ニューギニヤモルッカ州シエフ第36師団野戦病院 1944 年 3 月 31 日","中納伍郎 伍長 中華民国江蘚省上海独立砲兵第2連隊第5中隊 1946 年 6 月 20 日","鹿能嘉市 海軍一等兵曹 中部太平洋方面 1944 年 6 月 19 日","宮元喜一郎 兵長 沖縄本島豊見城 1945 年 5 月 15 日","尾村信一 上等兵 満州国興安北省ノモンハン 1939 年 8 月 24 日","白馬喜三郎 上等兵 薩哈嗹陸軍病院ルイコフ分院 1921 年 3 月 2 日","徳田秀夫 兵長 南支那方面 1944 年 9 月 10 日","山口邦夫 伍長 ソロモン群島ガダルカナル島アウステン山第一線陣地 1943 年 1 月 22 日","桜田春雄 陸軍飛行少尉 沖縄群島伊江島 1945 年 5 月 18 日","富吉一夫 海軍二等兵曹 内南洋方面 1943 年 6 月 8 日","能登勝夫 兵長 南洋群島ブラウン 1944 年 2 月 24 日","南沢庄太郎 海軍軍属 北太平洋方面 1943 年 8 月 12 日","福田駒蔵 兵長 沖縄本島真栄里 1945 年 6 月 19 日","山本竹伍郎 海軍上等整備兵曹 比島ピナッポ（ピナツボ）山西北 1945 年 4 月 7 日","杉村正幸 伍長 沖縄本島翁長 1945 年 4 月 26 日","岩崎留太郎 一等兵 旭川陸軍病院 1942 年 5 月 31 日","大和田勇雄 兵長 南洋群島・カロリン諸島・オッタカリ島 1945 年 4 月 10 日","遠藤　博 兵長 満州延吉第1陸軍病院 1945 年 12 月 3 日","横島勝三郎 兵長 中華民国河北省獻県章鎮 1940 年 6 月 27 日","小林政蔵 軍曹 北島中部ルソン島 1945 年 7 月 30 日","福島勝春 伍長 沖縄本島大理 1945 年 6 月 20 日","山田嘉蔵 伍長 比島ミンダナオ島 1945 年 6 月 27 日","木口勝美 軍曹 硫黄島方面 1945 年 3 月 17 日","工藤春夫 三等兵曹 宮城県亘理郡山下村 1940 年 5 月 10 日","川股鉄三郎 海軍軍属 サイパン島北方洋上 1944 年 6 月 15 日","飴谷勝蔵 海軍一等整備兵 南太平洋方面 1942 年 10 月 26 日","福島庸吉 伍長 河南省石砦附近 1938 年 5 月 25 日","中村満芳 軍曹 印度国アッサム州コヒマニ（ナガランドコヒマ） 1944 年 4 月 7 日","田沢政雄 上等兵 中華民国牡丹江省 1945 年 5 月 15 日","山本武雄 兵長 西部ニューギニヤ「サルミ」 1944 年 10 月 11 日","久保田勝次郎 兵長 西武ニューギニアサルミ 1944 年 8 月 2 日","広田久四郎 海軍二等兵曹 南太平洋方面 1942 年 10 月 26 日","佐々木且三 兵長 西部ニューギニヤ「サルミ」 1944 年 9 月 4 日","山田留八 伍長 沖縄本島新垣 1945 年 6 月 18 日","三上修蔵 上等兵 江蘇省銅山県徐州野戦予備病院 1938 年 6 月 7 日","三上竜蔵 兵長 中華民国河北省滄県許村 1941 年 2 月 4 日","石岡栄蔵 曹長 中華民国江省瑞昌県下洞余村 1938 年 9 月 23 日","下川部栄作 伍長 沖縄本島真栄里 1945 年 6 月 24 日","山形源五郎 上等兵 　　　　　　　〃 1945 年 6 月 19 日","中山文雄 兵長 沖縄本島弁ヶ島 1945 年 5 月 16 日","中山一二 兵長 南洋群島カロリン諸島メレヨン島オッタカイ島 1945 年 4 月 19 日","岩崎秀蔵 上等兵 アッツ島 1943 年 5 月 29 日","臼杵栄作 一等兵 函館中央病院 1944 年 4 月 20 日","根津源一 上等兵曹 南支那）海方）面 1944 年 5 月 22 日","岩田作馬 上等兵 満州国興安北南ノモンハン 1939 年 8 月 25 日","大石信夫 上等兵 満州国浜江省阿城県阿城 1943 年 5 月 23 日","大河内政治 兵長 ビルマ国テイカンパン 1945 年 3 月 13 日","柚木安一 上等兵 厚沢部村鷲堀 1951 年 8 月 7 日","土田楠寛 伍長 ソロモン群島ガダルカナル 1942 年 8 月 21 日","佐々木貞美 海軍水兵長 比島方面 1944 年 10 月 25 日","上野秀男 伍長 沖縄幸地 1945 年 5 月 20 日","鹿能勝三郎 伍長 比島ルソン島 1945 年 5 月 20 日","奈良　浩 伍長 中華民国吉林省敦化県敦化長野病院 1945 年 5 月 15 日","西田　要 海軍二等機関兵曹 ニューギニヤ南東海面 1942 年 5 月 7 日","三上惣吉 准尉 東部ニューギニアトウマング 1944 年 10 月 5 日","木村邦三 伍長 沖縄国吉 1945 年 6 月 26 日","木村政二 伍長 ソ連アムフレ州イズベストコーワヤ地区ウルガール収容所 1948 年 9 月 20 日","干山　口 一等兵 札幌陸軍病院 1942 年 3 月 4 日","干山長助 陸軍兵長 南洋群島方面 1945 年 1 月 6 日","干山　巷 伍長 南洋群島ミレ 1945 年 7 月 22 日","宮下鉄男 海飛兵長 台南航空基地 1945 年 4 月 7 日","紺野徳太郎 伍長 満州国安北省ハルハ河 1939 年 7 月 12 日","菅野一郎 兵長 南洋群島ブラウン島 1944 年 2 月 24 日","高杉柳次郎 兵長 南洋群島カロリン島メレヨン島オッタカイ島 1945 年 2 月 24 日","井越惣四郎 兵長 沖縄本島真壁 1945 年 4 月 19 日","八巻英治 伍長 中華民国湖南省衡陽市方面 1944 年 8 月 4 日","森高正直 伍長 樺太真岡廊清水村熊笹峠 1945 年 8 月 22 日","大和田富一 伍長 ニューギニヤ「サルミ」 1946 年 3 月 21 日","吉田信一 一等兵 沖縄本島島尻郡 1945 年 6 月 29 日","西沢一雄 兵長 沖縄八重瀬島 1945 年 6 月 17 日","沢田哲夫 軍曹 沖縄本島島尻郡真壁 1945 年 6 月 10 日","斎藤定明 兵長 沖縄運玉玉稜？） 1945 年 9 月 11 日","野沢菊太郎 海軍二等機関兵曹 比島マニラ部 1945 年 2 月 23 日","堀　　清 軍曹 沖縄本島真栄里 1945 年 6 月 19 日","堀　幸男 三等兵曹 野北病院 1945 年 6 月 4 日","谷　四郎 伍長 北千島占守島国端四領 1945 年 8 月 18 日","新谷与三吉 軍属 満州国竜江省 1944 年 8 月 1 日","麓　定男 伍長 沖縄本島首里 1945 年 5 月 15 日","古世　優 伍長 沖縄本島幸地 1945 年 5 月 2 日","杉山久二 上等兵 比島ルソン島リザール州マッキンレー 1942 年 5 月 26 日","沢中清一 上等兵 亀田郡七飯 1949 年 2 月 13 日","佐藤義明 上等兵 中華民国河北省獻県大章鎮 1940 年 6 月 27 日","長崎源次 軍属 海南島白沙県石碌西松組出張所 1943 年 6 月 13 日","川辺一司 上等兵 山西省霊●丘）県楽陶山宵家楼 1938 年 11 月 30 日","川崎利平 一等兵 室蘭市常磐町13室蘭病院 1942 年 2 月 22 日","斉蔵達三 准尉 比島ミンダナオ島 1945 年 6 月 10 日","伊藤文次郎 上等兵 中華民国河北省石家荘陸軍病院 1939 年 8 月 28 日","角田角蔵 　〃 函館病院 1944 年 6 月 27 日","伊勢谷忠吉 伍長 沖縄本島宇江城 1945 年 6 月 25 日","平野　節 上等兵 ソ連沿海州ムリー地区アクール病院 1947 年 10 月 10 日","北島信利 陸軍少尉 沖縄方面 1945 年 6 月 10 日","干場忠栄 海軍軍属 ギルバート諸島 1943 年 11 月 15 日","中林安太郎 伍長 ソロモン諸島ガダルカナル島ビザン 1943 年 1 月 19 日","岩山長三郎 上等兵 西部ニューギニア「サルミ」 1944 年 10 月 23 日","鈴木保男 伍長 比島ネグロス島 1945 年 6 月 23 日","高橋正彦 兵長 厚沢部中館 1948 年 6 月 15 日","鈴木敬一 兵長 南洋群島カロリン諸島メレヨン島 1944 年 11 月 30 日","成田英男 海軍上等水兵 モルッカ諸島 1944 年 6 月 29 日","成田丑太郎 兵長 中華民国湖南省衡陽県衡陽第兵站病院 1944 年 9 月 3 日","表神明伊佐美 上等兵 満州国奉天省奉天 1936 年 11 月 8 日","佐々木国男 兵長 満州国奉天省熊兵岳）城陸軍病院 1942 年 7 月 10 日","朝倉　寛 伍長 ニューギニヤ「サルミ」 1945 年 3 月 17 日","村田七楼 兵長 沖縄本島真栄里 1945 年 6 月 19 日","相良栄吉 海軍一等飛曹 珊瑚海 1942 年 5 月 7 日","保木本雪雄 伍長 沖縄本島伊敷 1945 年 6 月 22 日","上野忠雄 伍長 沖縄本島真栄平 1945 年 6 月 11 日","岡頭松蔵 兵長 ソロモン群島ガダルカナルタイボ岬 1942 年 9 月 1 日","室　滋晴 上等兵 南千島択捉島 1944 年 11 月 15 日","竹山松雄 伍長 中華民国河北省安国県常家村 1945 年 6 月 28 日","板木福士 少尉 比島「クラーク」西南方マニラ 1945 年 1 月 11 日","福田吉五郎 上等兵 マリアナ諸島方面 1944 年 8 月 10 日","竹ヶ原吉夫 伍長 沖縄本島幸地 1945 年 4 月 30 日","畠谷幹男 兵長 旭川市近文線5号 1944 年 12 月 27 日","村田慶造 海軍水兵長 硫黄島 1945 年 3 月 17 日","伊藤定一 二等兵曹 ソロモン諸島 1942 年 12 月 20 日","股村万四郎 一等兵 厚沢部南館 1944 年 7 月 11 日","木下清雄 伍長 西部ニューギニヤ「サルミ」 1945 年 7 月 11 日","木下藤吉郎 一等兵 満州 1904 年 11 月 28 日","由利政吉 海軍一等水兵 中支湖北省武昌陸軍病院 1944 年 12 月 13 日","木村武国 海軍水兵長 比島クラーク地区 1945 年 5 月 16 日","小沢完三 伍長 小倉陸軍病院 1938 年 9 月 19 日","敦賀政美 海軍上等水兵 本那海面 1945 年 1 月 12 日","徳田樺夫 兵長 樺太豊真山道熊笹峠 1945 年 9 月 22 日"],null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addLayersControl","args":[["osm","gmap"],["日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後","死亡年別戦死者"],{"collapsed":true,"autoZIndex":true,"position":"topright"}]},{"method":"hideGroup","args":[["日中戦争開戦以前","太平洋戦争開戦以前","太平洋戦争開戦後","gmap"]]},{"method":"addLegend","args":[{"colors":["#808080 , #808080 10.4087257374069%, #808080 22.1368674133584%, #808080 33.8650090893098%, #808080 45.5931507652612%, #808080 57.3212924412127%, #423F85 69.0494341171641%, #20928C 80.7775757931156%, #8DD646 92.505717469067%, #808080 "],"labels":["1909-10-08","1915-03-31","1920-09-20","1926-03-13","1931-09-03","1937-02-23","1942-08-16","1948-02-06"],"na_color":null,"na_label":"NA","opacity":0.5,"position":"topright","type":"numeric","title":"戦没年月日","extra":{"p_1":0.1040872573740691,"p_n":0.9250571746906703},"layerId":null,"className":"info legend","group":null}]}],"limits":{"lat":[-11.20864574889617,52.877626],"lng":[94.108063,173.7643261808604]}},"evals":[],"jsHooks":{"render":[{"code":"function(el, x, data) {\n  return (\n    function(el, x) {\n      var style = '<style>#' + el.id + ' { width: 100%; height: 100%; }<\/style>';\n      $('head').append(style);\n    }).call(this.getMap(), el, x, data);\n}","data":null}]}}</script>
+<script type="application/htmlwidget-sizing" data-for="htmlwidget-77ded5c39dd94df81c21">{"viewer":{"width":"100%","height":400,"padding":0,"fill":true},"browser":{"width":"100%","height":400,"padding":0,"fill":true}}</script>
 </body>
 </html>
